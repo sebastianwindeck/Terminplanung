@@ -1,0 +1,60 @@
+# Azure Container Apps / ACI multi-container definition
+# Deploy with: az container create --file aci-compose.yml -g <resource-group>
+# Adjust image names and credentials before use.
+
+name: terminplanung-app
+apiVersion: 2021-10-01
+location: westeurope
+properties:
+  containers:
+    - name: backend
+      properties:
+        image: <ACR_NAME>.azurecr.io/terminplanung-backend:latest
+        resources:
+          requests:
+            cpu: 0.5
+            memoryInGb: 0.75
+        ports:
+          - port: 8000
+        environmentVariables:
+          - name: DATABASE_URL
+            value: sqlite:////data/terminplanung.db
+          - name: ALLOWED_ORIGINS
+            value: '["http://localhost:80"]'
+        volumeMounts:
+          - name: data-volume
+            mountPath: /data
+
+    - name: frontend
+      properties:
+        image: <ACR_NAME>.azurecr.io/terminplanung-frontend:latest
+        resources:
+          requests:
+            cpu: 0.25
+            memoryInGb: 0.25
+        ports:
+          - port: 80
+
+  osType: Linux
+  restartPolicy: Always
+
+  ipAddress:
+    type: Public
+    ports:
+      - protocol: TCP
+        port: 80
+      - protocol: TCP
+        port: 8000
+    dnsNameLabel: terminplanung
+
+  volumes:
+    - name: data-volume
+      azureFile:
+        shareName: terminplanung-data
+        storageAccountName: <STORAGE_ACCOUNT>
+        storageAccountKey: <STORAGE_KEY>
+
+  imageRegistryCredentials:
+    - server: <ACR_NAME>.azurecr.io
+      username: <ACR_NAME>
+      password: <ACR_PASSWORD>
