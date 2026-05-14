@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build: ./backend
@@ -7,9 +5,11 @@ services:
     restart: unless-stopped
     volumes:
       - db_data:/data
+      - terminplanung_storage:/app/storage
     environment:
       - DATABASE_URL=sqlite:////data/terminplanung.db
       - ALLOWED_ORIGINS=["http://localhost", "http://localhost:80", "http://localhost:3000"]
+      - STORAGE_ROOT=/app/storage
     ports:
       - "8000:8000"
     healthcheck:
@@ -29,3 +29,4 @@ services:
 
 volumes:
   db_data:
+  terminplanung_storage:

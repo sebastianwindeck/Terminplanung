@@ -3,12 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare } from "lucide-react";
 import { ViewMode } from "gantt-task-react";
-import { projectsApi, versionsApi, positionsApi } from "@/api/client";
+import { projectsApi, versionsApi, positionsApi, mspdiApi } from "@/api/client";
 import GanttChart from "@/components/GanttChart";
 import PositionTable from "@/components/PositionTable";
 import ImportDialog from "@/components/ImportDialog";
 import PositionEditModal from "@/components/PositionEditModal";
 import CompareDialog from "@/components/CompareDialog";
+import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
 
 type Tab = "table" | "gantt";
 type GanttView = "Day" | "Week" | "Month";
@@ -34,6 +35,7 @@ export default function ScheduleView() {
   const [tab, setTab] = useState<Tab>("table");
   const [ganttView, setGanttView] = useState<GanttView>("Week");
   const [showImport, setShowImport] = useState(false);
+  const [showMspdiImport, setShowMspdiImport] = useState(false);
   const [showNewPosition, setShowNewPosition] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
 
@@ -70,6 +72,16 @@ export default function ScheduleView() {
               <GitCompare className="w-4 h-4" /> Vergleichen
             </button>
           )}
+          <button className="btn-secondary" onClick={() => setShowMspdiImport(true)}>
+            <Upload className="w-4 h-4" /> MS Project importieren
+          </button>
+          <a
+            href={mspdiApi.exportUrl(vid)}
+            download
+            className="btn-secondary"
+          >
+            <Download className="w-4 h-4" /> MS Project exportieren
+          </a>
           <a
             href={positionsApi.exportUrl(vid)}
             download
@@ -137,6 +149,7 @@ export default function ScheduleView() {
       )}
 
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} versionId={vid} />
+      <MSPDIImportDialog open={showMspdiImport} onClose={() => setShowMspdiImport(false)} projectId={pid} />
 
       {showNewPosition && (
         <PositionEditModal

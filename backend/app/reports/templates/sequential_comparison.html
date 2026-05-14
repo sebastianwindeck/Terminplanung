@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Terminplan-Vergleichsbericht</title>
+<style>
+  :root { --primary: {{ settings.primary_color }}; --secondary: {{ settings.secondary_color }}; }
+  @page { size: A4; margin: 20mm 15mm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; }
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 16px; }
+  .company-name { font-size: 14pt; font-weight: bold; color: var(--primary); }
+  .report-title { font-size: 18pt; font-weight: bold; margin-bottom: 4px; }
+  .step { margin-bottom: 24px; page-break-inside: avoid; }
+  .step-header { background: var(--primary); color: white; padding: 6px 12px; font-weight: bold; font-size: 11pt; border-radius: 4px; }
+  .changes-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }
+  .changes-table th { background: #f3f4f6; text-align: left; padding: 4px 8px; border: 1px solid #e5e7eb; }
+  .changes-table td { padding: 4px 8px; border: 1px solid #e5e7eb; }
+  .added { background: #d1fae5; }
+  .removed { background: #fee2e2; }
+  .modified { background: #fef3c7; }
+  .badge-added { color: #065f46; background: #d1fae5; padding: 1px 6px; border-radius: 9999px; font-size: 8pt; }
+  .badge-removed { color: #991b1b; background: #fee2e2; padding: 1px 6px; border-radius: 9999px; font-size: 8pt; }
+  .badge-modified { color: #92400e; background: #fef3c7; padding: 1px 6px; border-radius: 9999px; font-size: 8pt; }
+  .email-section { margin-top: 8px; font-size: 9pt; color: #555; }
+  .email-item { background: #f8f9fa; padding: 4px 8px; border-left: 3px solid var(--secondary); margin-bottom: 4px; }
+  .footer-text { font-size: 8pt; color: #888; text-align: center; margin-top: 16px; }
+  .summary-row { display: flex; gap: 16px; margin-bottom: 8px; font-size: 9pt; }
+  .summary-badge { padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
+  .logo { max-height: 48px; max-width: 160px; }
+  h2 { font-size: 13pt; color: var(--primary); margin: 0 0 4px 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="company-name">{{ settings.company_name }}</div>
+    {% if settings.address %}<div style="font-size:8pt;color:#666">{{ settings.address }}</div>{% endif %}
+  </div>
+  {% if logo_b64 %}<img class="logo" src="data:{{ settings.logo_mime_type or 'image/png' }};base64,{{ logo_b64 }}" alt="Logo">{% endif %}
+</div>
+
+<div class="report-title">Terminplan-Vergleichsbericht</div>
+<div style="font-size:10pt;color:#555;margin-bottom:4px;">Projekt: <strong>{{ project_name }}</strong></div>
+<div style="font-size:9pt;color:#888;margin-bottom:16px;">Erstellt: {{ generated_at }}</div>
+
+{% if settings.header_text %}<p style="font-size:9pt;color:#555;border-bottom:1px solid #e5e7eb;padding-bottom:8px;margin-bottom:16px;">{{ settings.header_text }}</p>{% endif %}
+
+{% for step in steps %}
+<div class="step">
+  <div class="step-header">Schritt {{ loop.index }}: V{{ step.from_version_number }} {{ step.from_version_name }} &rarr; V{{ step.to_version_number }} {{ step.to_version_name }}</div>
+
+  <div class="summary-row" style="margin-top:8px;">
+    <span class="summary-badge" style="background:#d1fae5;color:#065f46;">+{{ step.added|length }} Hinzugef&uuml;gt</span>
+    <span class="summary-badge" style="background:#fee2e2;color:#991b1b;">-{{ step.removed|length }} Entfernt</span>
+    <span class="summary-badge" style="background:#fef3c7;color:#92400e;">~{{ step.modified|length }} Ge&auml;ndert</span>
+  </div>
+
+  {% if step.email_events_between %}
+  <div class="email-section">
+    <strong>Korrespondenz in diesem Zeitraum:</strong>
+    {% for email in step.email_events_between %}
+    <div class="email-item">
+      <strong>{{ email.email_date.strftime('%Y-%m-%d') if email.email_date else '' }}</strong> &mdash; {{ email.subject }} ({{ email.sender }})
+      {% if email.tag %} [{{ email.tag }}]{% endif %}
+      {% if email.note %}<br><em>{{ email.note }}</em>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if step.added or step.removed or step.modified %}
+  <table class="changes-table" style="margin-top:8px;">
+    <thead><tr><th>Typ</th><th>Pos.-Nr.</th><th>Bezeichnung</th><th>&Auml;nderungen</th></tr></thead>
+    <tbody>
+    {% for entry in step.added %}
+    <tr class="added"><td><span class="badge-added">Neu</span></td><td>{{ entry.pos_number or '&ndash;' }}</td><td>{{ entry.title }}</td><td>Neu hinzugef&uuml;gt</td></tr>
+    {% endfor %}
+    {% for entry in step.removed %}
+    <tr class="removed"><td><span class="badge-removed">Entfernt</span></td><td>{{ entry.pos_number or '&ndash;' }}</td><td>{{ entry.title }}</td><td>Entfernt</td></tr>
+    {% endfor %}
+    {% for entry in step.modified %}
+    <tr class="modified"><td><span class="badge-modified">Ge&auml;ndert</span></td><td>{{ entry.pos_number or '&ndash;' }}</td><td>{{ entry.title }}</td><td>{% for field, change in entry.field_changes.items() %}{{ field }}: {{ change.old or '&ndash;' }} &rarr; {{ change.new or '&ndash;' }}{% if not loop.last %}; {% endif %}{% endfor %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="font-size:9pt;color:#888;margin-top:8px;font-style:italic;">Keine Positions&auml;nderungen.</p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if settings.footer_text %}<div class="footer-text">{{ settings.footer_text }}</div>{% endif %}
+<div class="footer-text">Terminplanung &ndash; {{ generated_at }}</div>
+</body>
+</html>

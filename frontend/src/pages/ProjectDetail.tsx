@@ -7,13 +7,19 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { projectsApi, versionsApi } from "@/api/client";
 import Modal from "@/components/Modal";
+import ChronologyTimeline from "@/components/timeline/ChronologyTimeline";
+import EmailEventList from "@/components/emails/EmailEventList";
+import SequentialComparisonView from "@/components/comparison/SequentialComparisonView";
 import type { ScheduleVersion } from "@/types";
+
+type ProjectTab = "versions" | "emails" | "compare";
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const id = Number(projectId);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("versions");
   const [showCreate, setShowCreate] = useState(false);
   const [cloneFrom, setCloneFrom] = useState<number | "">("");
   const [form, setForm] = useState({ name: "", description: "", is_baseline: false });
@@ -76,7 +82,42 @@ export default function ProjectDetail() {
         <p className="text-sm text-gray-600 bg-white rounded-lg border border-gray-200 px-4 py-3">{project.description}</p>
       )}
 
-      {isLoading ? (
+      {/* Chronology timeline */}
+      <div className="card p-4">
+        <ChronologyTimeline projectId={id} versions={versions} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        {(["versions", "emails", "compare"] as ProjectTab[]).map((tab) => {
+          const labels: Record<ProjectTab, string> = { versions: "Versionen", emails: "E-Mails", compare: "Vergleich" };
+          return (
+            <button
+              key={tab}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab
+                  ? "border-primary-600 text-primary-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {labels[tab]}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "emails" && (
+        <EmailEventList projectId={id} versions={versions} />
+      )}
+
+      {activeTab === "compare" && (
+        <SequentialComparisonView projectId={id} versions={versions} />
+      )}
+
+      {activeTab === "versions" && (
+        isLoading ? (
         <div className="text-center py-16 text-gray-400 text-sm">Lade Versionen…</div>
       ) : versions.length === 0 ? (
         <div className="card p-16 text-center">
@@ -148,6 +189,7 @@ export default function ProjectDetail() {
             </div>
           ))}
         </div>
+      )
       )}
 
       <Modal open={showCreate} onClose={() => { setShowCreate(false); setCloneFrom(""); }} title="Neue Version">

@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { CalendarDays, FolderOpen, BarChart3 } from "lucide-react";
+import { CalendarDays, FolderOpen, BarChart3, Settings } from "lucide-react";
 
 export default function Layout() {
   return (
@@ -22,6 +22,17 @@ export default function Layout() {
             >
               <FolderOpen className="w-4 h-4" />
               Projekte
+            </NavLink>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive ? "bg-primary-900/60" : "hover:bg-primary-600"
+                }`
+              }
+            >
+              <Settings className="w-4 h-4" />
+              Einstellungen
             </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-2 text-primary-200 text-xs">

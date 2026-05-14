@@ -5,6 +5,12 @@ import type {
   SchedulePosition,
   ImportResult,
   VersionComparison,
+  EmailEvent,
+  TimelineResponse,
+  CompanySettings,
+  SequentialComparisonResponse,
+  GeneratedReport,
+  MSPDIImportResult,
 } from "@/types";
 
 const api = axios.create({ baseURL: "/api" });
@@ -57,4 +63,78 @@ export const positionsApi = {
     return api.post<ImportResult>(`/positions/version/${versionId}/import`, fd).then((r) => r.data);
   },
   exportUrl: (versionId: number) => `/api/positions/version/${versionId}/export`,
+};
+
+// ── Emails ────────────────────────────────────────────────────────────────────
+
+export const emailsApi = {
+  listForProject: (projectId: number) =>
+    api.get<EmailEvent[]>(`/projects/${projectId}/emails`).then((r) => r.data),
+  get: (id: number) => api.get<EmailEvent>(`/emails/${id}`).then((r) => r.data),
+  create: (data: Partial<EmailEvent> & { project_id: number }, file?: File) => {
+    const fd = new FormData();
+    fd.append("data", JSON.stringify(data));
+    if (file) fd.append("file", file);
+    return api.post<EmailEvent>("/emails", fd).then((r) => r.data);
+  },
+  update: (id: number, data: Partial<EmailEvent>, file?: File) => {
+    const fd = new FormData();
+    fd.append("data", JSON.stringify(data));
+    if (file) fd.append("file", file);
+    return api.put<EmailEvent>(`/emails/${id}`, fd).then((r) => r.data);
+  },
+  delete: (id: number) => api.delete(`/emails/${id}`),
+  attachmentUrl: (id: number) => `/api/emails/${id}/attachment`,
+};
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+
+export const timelineApi = {
+  getForProject: (projectId: number) =>
+    api.get<TimelineResponse>(`/projects/${projectId}/timeline`).then((r) => r.data),
+};
+
+// ── MSPDI ─────────────────────────────────────────────────────────────────────
+
+export const mspdiApi = {
+  import: (projectId: number, file: File, versionName?: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("project_id", String(projectId));
+    if (versionName) fd.append("version_name", versionName);
+    return api.post<MSPDIImportResult>("/mspdi/import", fd).then((r) => r.data);
+  },
+  exportUrl: (versionId: number) => `/api/mspdi/export/${versionId}`,
+};
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+export const reportsApi = {
+  getSequentialComparison: (projectId: number, versionIds: number[]) =>
+    api
+      .post<SequentialComparisonResponse>(`/projects/${projectId}/sequential-comparison`, { version_ids: versionIds })
+      .then((r) => r.data),
+  generatePdf: (projectId: number, versionIds: number[]) =>
+    api
+      .post<GeneratedReport>(`/projects/${projectId}/reports/sequential-comparison`, { version_ids: versionIds })
+      .then((r) => r.data),
+  listForProject: (projectId: number) =>
+    api.get<GeneratedReport[]>(`/projects/${projectId}/reports`).then((r) => r.data),
+  downloadUrl: (reportId: number) => `/api/reports/${reportId}/download`,
+  delete: (reportId: number) => api.delete(`/reports/${reportId}`),
+};
+
+// ── Company Settings ──────────────────────────────────────────────────────────
+
+export const companySettingsApi = {
+  get: () => api.get<CompanySettings>("/company-settings").then((r) => r.data),
+  update: (data: Partial<CompanySettings>) =>
+    api.put<CompanySettings>("/company-settings", data).then((r) => r.data),
+  uploadLogo: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post<CompanySettings>("/company-settings/logo", fd).then((r) => r.data);
+  },
+  deleteLogo: () => api.delete("/company-settings/logo").then((r) => r.data),
+  logoUrl: () => "/api/company-settings/logo",
 };

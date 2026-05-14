@@ -50,7 +50,7 @@ export default function PositionTable({ positions, versionId }: Props) {
 
   const editPos = editId !== null ? positions.find((p) => p.id === editId) : null;
 
-  const renderRow = (pos: SchedulePosition, depth = 0) => {
+  const renderRow = (pos: SchedulePosition, depth = 0): JSX.Element[] => {
     const kids = childrenOf(pos.id);
     const isCollapsed = collapsed.has(pos.id);
     return [
