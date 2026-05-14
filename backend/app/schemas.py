@@ -36,6 +36,8 @@ class VersionBase(BaseModel):
     name: str
     description: Optional[str] = None
     is_baseline: bool = False
+    shift_reason: Optional[str] = None
+    shift_description: Optional[str] = None
 
 
 class VersionCreate(VersionBase):
@@ -48,6 +50,8 @@ class VersionUpdate(BaseModel):
     description: Optional[str] = None
     is_baseline: Optional[bool] = None
     is_current: Optional[bool] = None
+    shift_reason: Optional[str] = None
+    shift_description: Optional[str] = None
 
 
 class VersionResponse(VersionBase):

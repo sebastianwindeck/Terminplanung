@@ -29,6 +29,8 @@ class ScheduleVersion(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_baseline: Mapped[bool] = mapped_column(Boolean, default=False)
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    shift_reason: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shift_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

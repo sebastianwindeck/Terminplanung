@@ -16,10 +16,24 @@ export interface ScheduleVersion {
   description?: string;
   is_baseline: boolean;
   is_current: boolean;
+  shift_reason?: string;
+  shift_description?: string;
   created_at: string;
   updated_at: string;
   position_count: number;
 }
+
+export const SHIFT_REASONS: { value: string; label: string }[] = [
+  { value: "nachtrag_2_5_vob_b",       label: "Nachtrag (§ 2 Nr. 5 VOB/B)" },
+  { value: "bauherr_1_3_vob_b",         label: "Bauherrenänderung (§ 1 Abs. 3 VOB/B)" },
+  { value: "behinderung_6_1_vob_b",     label: "Behinderung angemeldet (§ 6 Abs. 1 VOB/B)" },
+  { value: "witterung_6_2_vob_b",       label: "Witterungsbedingungen (§ 6 Abs. 2 Nr. 2 VOB/B)" },
+  { value: "planlieferung",             label: "Planlieferverzug" },
+  { value: "bedenken_4_3_vob_b",        label: "Bedenkenanmeldung (§ 4 Abs. 3 VOB/B)" },
+  { value: "massenänderung_2_3_vob_b",  label: "Massenänderung (§ 2 Nr. 3 VOB/B)" },
+  { value: "auftraggeber_verzug",       label: "Auftraggeber-Verzug" },
+  { value: "sonstiges",                 label: "Sonstiges" },
+];
 
 export type PositionStatus = "planned" | "in_progress" | "completed" | "delayed" | "cancelled";
 

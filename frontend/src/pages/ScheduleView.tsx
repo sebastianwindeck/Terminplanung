@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare, Pencil } from "lucide-react";
 import { ViewMode } from "gantt-task-react";
 import { projectsApi, versionsApi, positionsApi, mspdiApi } from "@/api/client";
 import GanttChart from "@/components/GanttChart";
@@ -10,6 +11,8 @@ import ImportDialog from "@/components/ImportDialog";
 import PositionEditModal from "@/components/PositionEditModal";
 import CompareDialog from "@/components/CompareDialog";
 import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
+import Modal from "@/components/Modal";
+import { SHIFT_REASONS } from "@/types";
 
 type Tab = "table" | "gantt";
 type GanttView = "Day" | "Week" | "Month";
@@ -38,6 +41,10 @@ export default function ScheduleView() {
   const [showMspdiImport, setShowMspdiImport] = useState(false);
   const [showNewPosition, setShowNewPosition] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showEditVersion, setShowEditVersion] = useState(false);
+  const [shiftForm, setShiftForm] = useState({ shift_reason: "", shift_description: "" });
+
+  const qc = useQueryClient();
 
   const { data: project } = useQuery({ queryKey: ["project", pid], queryFn: () => projectsApi.get(pid) });
   const { data: version } = useQuery({ queryKey: ["version", vid], queryFn: () => versionsApi.get(vid) });
@@ -46,6 +53,25 @@ export default function ScheduleView() {
     queryKey: ["positions", vid],
     queryFn: () => positionsApi.listForVersion(vid),
   });
+
+  const updateVersionMutation = useMutation({
+    mutationFn: (data: { shift_reason?: string; shift_description?: string }) =>
+      versionsApi.update(vid, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["version", vid] });
+      toast.success("Version aktualisiert");
+      setShowEditVersion(false);
+    },
+    onError: () => toast.error("Fehler beim Speichern"),
+  });
+
+  const openShiftEdit = () => {
+    setShiftForm({
+      shift_reason: version?.shift_reason ?? "",
+      shift_description: version?.shift_description ?? "",
+    });
+    setShowEditVersion(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -62,6 +88,14 @@ export default function ScheduleView() {
             {version?.is_baseline && (
               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">Basis</span>
             )}
+            {version?.shift_reason && (
+              <span className="text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                {SHIFT_REASONS.find((r) => r.value === version.shift_reason)?.label ?? version.shift_reason}
+              </span>
+            )}
+            <button onClick={openShiftEdit} className="btn-ghost p-1 rounded" title="Verschiebungsgrund bearbeiten">
+              <Pencil className="w-3.5 h-3.5 text-gray-400" />
+            </button>
           </div>
           <p className="text-xs text-gray-400 mt-0.5">{positions.length} Positionen</p>
         </div>
@@ -167,6 +201,45 @@ export default function ScheduleView() {
           currentVersionId={vid}
         />
       )}
+
+      <Modal open={showEditVersion} onClose={() => setShowEditVersion(false)} title="Verschiebungsgrund bearbeiten">
+        <form
+          onSubmit={(e) => { e.preventDefault(); updateVersionMutation.mutate({ shift_reason: shiftForm.shift_reason || undefined, shift_description: shiftForm.shift_description || undefined }); }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="label">Grund der Verschiebung</label>
+            <select
+              className="input"
+              value={shiftForm.shift_reason}
+              onChange={(e) => setShiftForm((f) => ({ ...f, shift_reason: e.target.value }))}
+            >
+              <option value="">— Kein Grund angegeben —</option>
+              {SHIFT_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+          {shiftForm.shift_reason && (
+            <div>
+              <label className="label">Beschreibung zum Grund</label>
+              <textarea
+                className="input"
+                rows={4}
+                placeholder="Detaillierte Beschreibung der Verschiebungsursache…"
+                value={shiftForm.shift_description}
+                onChange={(e) => setShiftForm((f) => ({ ...f, shift_description: e.target.value }))}
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" className="btn-secondary" onClick={() => setShowEditVersion(false)}>Abbrechen</button>
+            <button type="submit" className="btn-primary" disabled={updateVersionMutation.isPending}>
+              {updateVersionMutation.isPending ? "Speichert…" : "Speichern"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
