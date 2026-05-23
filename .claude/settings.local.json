@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(textutil -convert txt -stdout \"/Users/sebastianwindeck/programming/windeck/Terminplanung/Lastenheft Stoerungsmanagement Fassadenbau.docx\")"
+    ]
+  }
+}
