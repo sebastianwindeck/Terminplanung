@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, Float, Boolean, Text
+from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, Float, Boolean, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
@@ -130,3 +130,156 @@ class GeneratedReport(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     project: Mapped["Project"] = relationship("Project")
+
+
+class Stoerung(Base):
+    __tablename__ = "stoerungen"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    project_id: Mapped[int] = mapped_column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    stoerung_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    titel: Mapped[str] = mapped_column(String(500), nullable=False)
+    stoerungsart: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    unterkategorie: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    beschreibung: Mapped[str] = mapped_column(Text, nullable=False)
+    stoerungsbeginn: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    kenntniszeitpunkt: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    stoerungsende: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    verantwortungsbereich: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    verursacher: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    betroffener_bereich: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    betroffener_vorgang_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("schedule_positions.id", ondelete="SET NULL"), nullable=True, index=True)
+    hindernde_wirkung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    auswirkungen_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    leistungsbereitschaft: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    ausweichleistung_moeglich: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    sofortmassnahme: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    erforderliche_mitwirkung_ag: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="entwurf", index=True)
+    kritikalitaet: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "stoerung_number", name="uq_stoerung_number"),
+        Index("ix_stoerungen_project_status", "project_id", "status"),
+    )
+
+    project: Mapped["Project"] = relationship("Project")
+    betroffener_vorgang: Mapped[Optional["SchedulePosition"]] = relationship(
+        "SchedulePosition", foreign_keys=[betroffener_vorgang_id])
+    anzeigen: Mapped[list["Behinderungsanzeige"]] = relationship(
+        "Behinderungsanzeige", back_populates="stoerung", cascade="all, delete-orphan")
+    anlagen: Mapped[list["Stoerungsanlage"]] = relationship(
+        "Stoerungsanlage", back_populates="stoerung", cascade="all, delete-orphan")
+    kausalitaeten: Mapped[list["Kausalitaet"]] = relationship(
+        "Kausalitaet", back_populates="stoerung", cascade="all, delete-orphan")
+
+
+class Behinderungsanzeige(Base):
+    __tablename__ = "behinderungsanzeigen"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stoerung_id: Mapped[int] = mapped_column(Integer, ForeignKey("stoerungen.id", ondelete="CASCADE"), nullable=False, index=True)
+    typ: Mapped[str] = mapped_column(String(30), nullable=False, default="erstanzeige")
+    adressat: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    cc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    versandart: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    versanddatum: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="entwurf", index=True)
+    pdf_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    pdf_stored_path: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sent_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    stoerung: Mapped["Stoerung"] = relationship("Stoerung", back_populates="anzeigen")
+
+
+class Bautagesbericht(Base):
+    __tablename__ = "bautagesberichte"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    project_id: Mapped[int] = mapped_column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    datum: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    wetter: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    temperatur_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    temperatur_max: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    wind: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    niederschlag: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    personalanzahl: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    arbeitszeit_von: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    arbeitszeit_bis: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    geplanter_vorgang_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("schedule_positions.id", ondelete="SET NULL"), nullable=True)
+    ausgefuehrter_vorgang_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("schedule_positions.id", ondelete="SET NULL"), nullable=True)
+    soll_menge: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    soll_einheit: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    ist_menge: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ist_einheit: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    abweichung_kommentar: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    stoerung_vorhanden: Mapped[bool] = mapped_column(Boolean, default=False)
+    stoerung_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("stoerungen.id", ondelete="SET NULL"), nullable=True, index=True)
+    anordnung_vorhanden: Mapped[bool] = mapped_column(Boolean, default=False)
+    anordnung_beschreibung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    allgemeine_bemerkungen: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    freigabestatus: Mapped[str] = mapped_column(String(20), default="erstellt", nullable=False)
+    created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "datum", name="uq_bautagesbericht_date"),
+        Index("ix_bautagesbericht_project_datum", "project_id", "datum"),
+    )
+
+    project: Mapped["Project"] = relationship("Project")
+    geplanter_vorgang: Mapped[Optional["SchedulePosition"]] = relationship(
+        "SchedulePosition", foreign_keys=[geplanter_vorgang_id])
+    ausgefuehrter_vorgang: Mapped[Optional["SchedulePosition"]] = relationship(
+        "SchedulePosition", foreign_keys=[ausgefuehrter_vorgang_id])
+    stoerung: Mapped[Optional["Stoerung"]] = relationship("Stoerung")
+
+
+class Kausalitaet(Base):
+    __tablename__ = "kausalitaeten"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stoerung_id: Mapped[int] = mapped_column(Integer, ForeignKey("stoerungen.id", ondelete="CASCADE"), nullable=False, index=True)
+    ereignis: Mapped[str] = mapped_column(Text, nullable=False)
+    verantwortungsbereich: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    behinderte_leistung_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("schedule_positions.id", ondelete="SET NULL"), nullable=True)
+    geplante_leistung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tatsaechliche_leistung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    unmittelbare_auswirkung_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mittelbare_auswirkung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    eigenverschulden_geprueft: Mapped[bool] = mapped_column(Boolean, default=False)
+    ergebnis_eigenverschulden: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    bewertung: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    stoerung: Mapped["Stoerung"] = relationship("Stoerung", back_populates="kausalitaeten")
+    behinderte_leistung: Mapped[Optional["SchedulePosition"]] = relationship(
+        "SchedulePosition", foreign_keys=[behinderte_leistung_id])
+
+
+class Stoerungsanlage(Base):
+    __tablename__ = "stoerungsanlagen"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stoerung_id: Mapped[int] = mapped_column(Integer, ForeignKey("stoerungen.id", ondelete="CASCADE"), nullable=False, index=True)
+    anlage_typ: Mapped[str] = mapped_column(String(30), nullable=False, default="sonstiges")
+    filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    stored_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    mime_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    beschreibung: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    datum: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    uploaded_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    stoerung: Mapped["Stoerung"] = relationship("Stoerung", back_populates="anlagen")

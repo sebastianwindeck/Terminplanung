@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 2cm 2.5cm; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; }
+  h1 { font-size: 16pt; color: #1e3a5f; border-bottom: 2pt solid #1e3a5f; padding-bottom: 4pt; }
+  h2 { font-size: 12pt; color: #1e3a5f; margin-top: 16pt; border-bottom: 1pt solid #ccc; }
+  h3 { font-size: 10pt; color: #333; margin-top: 10pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+  th { background: #1e3a5f; color: #fff; padding: 4pt 6pt; text-align: left; font-size: 9pt; }
+  td { padding: 3pt 6pt; border-bottom: 0.5pt solid #ddd; font-size: 9pt; }
+  tr:nth-child(even) td { background: #f5f7fa; }
+  .ampel-gruen { color: #16a34a; font-weight: bold; }
+  .ampel-gelb  { color: #d97706; font-weight: bold; }
+  .ampel-rot   { color: #dc2626; font-weight: bold; }
+  .badge { display: inline-block; padding: 1pt 6pt; border-radius: 3pt; font-size: 8pt; font-weight: bold; }
+  .badge-offen { background: #dbeafe; color: #1d4ed8; }
+  .badge-angezeigt { background: #fef3c7; color: #92400e; }
+  .badge-behoben { background: #dcfce7; color: #166534; }
+  .badge-abgeschlossen { background: #e5e7eb; color: #374151; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4pt 20pt; margin-top: 8pt; }
+  .meta-item label { font-weight: bold; font-size: 8pt; color: #555; display: block; }
+  .meta-item span { font-size: 9pt; }
+  .section-break { page-break-before: auto; }
+  .footer { position: fixed; bottom: 0; width: 100%; font-size: 7pt; color: #888; border-top: 0.5pt solid #ccc; padding-top: 3pt; }
+  .header-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12pt; }
+  .header-bar .project-info { font-size: 8pt; color: #555; text-align: right; }
+  .beschreibung { background: #f9fafb; border-left: 3pt solid #1e3a5f; padding: 6pt 10pt; margin: 6pt 0; font-size: 9pt; }
+</style>
+</head>
+<body>
+<div class="footer">
+  Störungsmanagement · {{ project.name }} · Erstellt: {{ now }} · Seite <pdf:pagenumber> von <pdf:pagecount>
+</div>
+
+<div class="header-bar">
+  <div>
+    <h1>Störungsakte</h1>
+    <div style="font-size:9pt; color:#555;">{{ stoerung.stoerung_number }} · {{ stoerung.titel }}</div>
+  </div>
+  <div class="project-info">
+    <strong>{{ project.name }}</strong><br>
+    {% if project.project_number %}Nr. {{ project.project_number }}<br>{% endif %}
+    {% if project.bauleiter %}Bauleiter: {{ project.bauleiter }}{% endif %}
+  </div>
+</div>
+
+<h2>Allgemeine Angaben</h2>
+<div class="meta-grid">
+  <div class="meta-item"><label>Störungsnummer</label><span>{{ stoerung.stoerung_number }}</span></div>
+  <div class="meta-item"><label>Status</label><span>{{ stoerung.status }}</span></div>
+  <div class="meta-item"><label>Störungsart</label><span>{{ stoerung.stoerungsart or '–' }}</span></div>
+  <div class="meta-item"><label>Kritikalität</label><span>{{ stoerung.kritikalitaet or '–' }}</span></div>
+  <div class="meta-item"><label>Störungsbeginn</label><span>{{ stoerung.stoerungsbeginn.strftime('%d.%m.%Y') if stoerung.stoerungsbeginn else '–' }}</span></div>
+  <div class="meta-item"><label>Störungsende</label><span>{{ stoerung.stoerungsende.strftime('%d.%m.%Y') if stoerung.stoerungsende else 'andauernd' }}</span></div>
+  <div class="meta-item"><label>Verantwortungsbereich</label><span>{{ stoerung.verantwortungsbereich or '–' }}</span></div>
+  <div class="meta-item"><label>Verursacher</label><span>{{ stoerung.verursacher or '–' }}</span></div>
+  <div class="meta-item"><label>Betroffener Bereich</label><span>{{ stoerung.betroffener_bereich or '–' }}</span></div>
+  <div class="meta-item"><label>Nachweis-Ampel</label>
+    <span class="ampel-{{ nachweis_ampel }}">
+      {% if nachweis_ampel == 'gruen' %}● Vollständig{% elif nachweis_ampel == 'gelb' %}● Teilweise{% else %}● Unvollständig{% endif %}
+    </span>
+  </div>
+</div>
+
+{% if stoerung.beschreibung %}
+<h3>Beschreibung</h3>
+<div class="beschreibung">{{ stoerung.beschreibung }}</div>
+{% endif %}
+
+{% if stoerung.hindernde_wirkung %}
+<h3>Hindernde Wirkung</h3>
+<div class="beschreibung">{{ stoerung.hindernde_wirkung }}</div>
+{% endif %}
+
+{% if stoerung.sofortmassnahme %}
+<h3>Sofortmaßnahme</h3>
+<div class="beschreibung">{{ stoerung.sofortmassnahme }}</div>
+{% endif %}
+
+{% if anzeigen %}
+<h2>Behinderungsanzeigen ({{ anzeigen|length }})</h2>
+<table>
+  <thead><tr><th>Typ</th><th>Adressat</th><th>Status</th><th>Versanddatum</th></tr></thead>
+  <tbody>
+  {% for a in anzeigen %}
+  <tr>
+    <td>{{ a.typ }}</td>
+    <td>{{ a.adressat or '–' }}</td>
+    <td>{{ a.status }}</td>
+    <td>{{ a.versanddatum.strftime('%d.%m.%Y') if a.versanddatum else '–' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if kausalitaeten %}
+<h2>Kausalitätskette ({{ kausalitaeten|length }})</h2>
+<table>
+  <thead><tr><th>#</th><th>Ereignis</th><th>Verantwortung</th><th>Unmittelbare Auswirkung</th><th>Bewertung</th></tr></thead>
+  <tbody>
+  {% for k in kausalitaeten %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ k.ereignis or '–' }}</td>
+    <td>{{ k.verantwortungsbereich or '–' }}</td>
+    <td>{{ k.unmittelbare_auswirkung_json or '–' }}</td>
+    <td>{{ k.bewertung or '–' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if anlagen %}
+<h2>Anlagenverzeichnis ({{ anlagen|length }})</h2>
+<table>
+  <thead><tr><th>#</th><th>Typ</th><th>Dateiname</th><th>Beschreibung</th><th>Datum</th></tr></thead>
+  <tbody>
+  {% for a in anlagen %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ a.anlage_typ }}</td>
+    <td>{{ a.filename }}</td>
+    <td>{{ a.beschreibung or '–' }}</td>
+    <td>{{ a.datum.strftime('%d.%m.%Y') if a.datum else '–' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+</body>
+</html>

@@ -8,6 +8,7 @@ from .config import settings
 from .database import engine, Base
 from .routers import projects, versions, positions
 from .routers import emails, timeline, mspdi, reports, company_settings
+from .routers import stoerungen, behinderungsanzeigen, bautagesberichte, kausalitaeten, stoerungsanlagen, stoerungs_reports
 
 Base.metadata.create_all(bind=engine)
 
@@ -30,11 +31,18 @@ app.include_router(mspdi.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(company_settings.router, prefix="/api")
 
+app.include_router(stoerungen.router, prefix="/api/v1")
+app.include_router(behinderungsanzeigen.router, prefix="/api/v1")
+app.include_router(bautagesberichte.router, prefix="/api/v1")
+app.include_router(kausalitaeten.router, prefix="/api/v1")
+app.include_router(stoerungsanlagen.router, prefix="/api/v1")
+app.include_router(stoerungs_reports.router, prefix="/api/v1")
+
 
 @app.on_event("startup")
 def create_storage_dirs() -> None:
     storage_root = Path(os.getenv("STORAGE_ROOT", "/app/storage"))
-    for subdir in ["email_attachments", "company", "reports"]:
+    for subdir in ["email_attachments", "company", "reports", "stoerungsanlagen"]:
         (storage_root / subdir).mkdir(parents=True, exist_ok=True)
 
 
