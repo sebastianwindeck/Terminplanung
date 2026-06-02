@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stoerungsApi, behinderungsanzeigeApi, kausalitaetApi, stoerungsanlageApi } from "@/api/stoerungen";
+import CausalityMatrix from "@/components/stoerungen/CausalityMatrix";
+import AuditLogTimeline from "@/components/stoerungen/AuditLogTimeline";
 import { DisruptionStatusBadge } from "@/components/stoerungen/DisruptionStatusBadge";
 import { EvidenceTrafficLight } from "@/components/stoerungen/EvidenceTrafficLight";
 import type { StoerungStatus } from "@/types/stoerung";
 
-type Tab = "uebersicht" | "anzeigen" | "anlagen" | "kausalitaet";
+type Tab = "uebersicht" | "anzeigen" | "anlagen" | "kausalitaet" | "protokoll";
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   entwurf:              ["offen", "verworfen"],
@@ -139,6 +141,7 @@ export default function DisruptionDetailPage() {
         <TabBtn t="anzeigen" label={`Anzeigen (${stoerung.anzeigen_count})`} />
         <TabBtn t="anlagen" label={`Anlagen (${stoerung.anlagen_count})`} />
         <TabBtn t="kausalitaet" label="Kausalität" />
+        <TabBtn t="protokoll" label="Protokoll" />
       </div>
 
       {tab === "uebersicht" && (
@@ -246,21 +249,14 @@ export default function DisruptionDetailPage() {
       )}
 
       {tab === "kausalitaet" && (
-        <div className="space-y-3">
-          {kausalitaeten?.map((k, i) => (
-            <div key={k.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between">
-                <span className="text-sm font-medium text-gray-700">#{i + 1} {k.ereignis}</span>
-                <span className="text-xs text-gray-500">{k.verantwortungsbereich}</span>
-              </div>
-              {k.unmittelbare_auswirkung_json && (
-                <p className="mt-1 text-sm text-gray-600">{k.unmittelbare_auswirkung_json}</p>
-              )}
-              {k.bewertung && <p className="mt-1 text-xs text-gray-500 italic">{k.bewertung}</p>}
-            </div>
-          ))}
-          {(!kausalitaeten || kausalitaeten.length === 0) && <p className="text-gray-500 text-sm">Noch keine Kausalitätserfassung.</p>}
-        </div>
+        <CausalityMatrix
+          stoerungId={stoerungId}
+          kausalitaeten={kausalitaeten ?? []}
+        />
+      )}
+
+      {tab === "protokoll" && (
+        <AuditLogTimeline stoerungId={stoerungId} />
       )}
     </div>
   );

@@ -3,6 +3,16 @@ export interface Project {
   name: string;
   description?: string;
   project_number?: string;
+  // Modul A – Projektstammdaten
+  client_name?: string | null;
+  client_address?: string | null;
+  construction_site_address?: string | null;
+  contract_number?: string | null;
+  contract_date?: string | null;
+  trade?: string | null;
+  construction_lead?: string | null;
+  site_manager?: string | null;
+  vob_b_agreed?: boolean | null;
   created_at: string;
   updated_at: string;
   version_count: number;
@@ -200,6 +210,70 @@ export interface GeneratedReport {
   filename: string;
   file_size_bytes: number;
   generated_at: string;
+}
+
+// Auth
+export type UserRole = "main_admin" | "company_admin" | "company_user";
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  full_name: string | null;
+  role: UserRole;
+  company_id: number | null;
+  is_active: boolean;
+}
+
+export interface Company {
+  id: number;
+  name: string;
+  slug: string;
+  primary_color: string | null;
+  logo_path: string | null;
+  is_active: boolean;
+  user_count: number;
+}
+
+export interface UserRecord {
+  id: number;
+  email: string;
+  full_name: string | null;
+  role: UserRole;
+  company_id: number | null;
+  is_active: boolean;
+}
+
+// Bautagesbericht
+export type FreigabeStatus = "erstellt" | "geprueft" | "freigegeben";
+
+export interface Bautagesbericht {
+  id: number;
+  project_id: number;
+  datum: string;
+  wetter: string | null;
+  temperatur_min: number | null;
+  temperatur_max: number | null;
+  wind: string | null;
+  niederschlag: string | null;
+  personalanzahl: number | null;
+  arbeitszeit_von: string | null;
+  arbeitszeit_bis: string | null;
+  geplanter_vorgang_id: number | null;
+  ausgefuehrter_vorgang_id: number | null;
+  soll_menge: number | null;
+  soll_einheit: string | null;
+  ist_menge: number | null;
+  ist_einheit: string | null;
+  abweichung_kommentar: string | null;
+  stoerung_vorhanden: boolean;
+  stoerung_id: number | null;
+  anordnung_vorhanden: boolean;
+  anordnung_beschreibung: string | null;
+  allgemeine_bemerkungen: string | null;
+  freigabestatus: FreigabeStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // MSPDI

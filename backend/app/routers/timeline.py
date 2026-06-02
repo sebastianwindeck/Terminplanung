@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 
-router = APIRouter(tags=["timeline"])
+router = APIRouter(tags=["timeline"], dependencies=[Depends(require_authenticated)])
 
 
 @router.get("/projects/{project_id}/timeline", response_model=schemas.TimelineResponse)

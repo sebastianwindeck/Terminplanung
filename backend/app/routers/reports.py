@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 from ..services import storage
 from ..services.pdf_report import generate_sequential_comparison_pdf
 
-router = APIRouter(tags=["reports"])
+router = APIRouter(tags=["reports"], dependencies=[Depends(require_authenticated)])
 
 _COMPARE_FIELDS = ["title", "start_date", "end_date", "duration_days", "responsible", "trade", "status", "progress"]
 

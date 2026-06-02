@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getStoredToken } from "@/api/client";
 import type {
   Stoerung,
   StoerungListItem,
@@ -10,6 +11,11 @@ import type {
 } from "@/types/stoerung";
 
 const v1 = axios.create({ baseURL: "/api/v1" });
+v1.interceptors.request.use((config) => {
+  const token = getStoredToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 // ── Störungen ─────────────────────────────────────────────────────────────────
 

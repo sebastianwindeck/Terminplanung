@@ -9,6 +9,7 @@ from .database import engine, Base
 from .routers import projects, versions, positions
 from .routers import emails, timeline, mspdi, reports, company_settings
 from .routers import stoerungen, behinderungsanzeigen, bautagesberichte, kausalitaeten, stoerungsanlagen, stoerungs_reports
+from .routers import auth, companies, users
 
 Base.metadata.create_all(bind=engine)
 
@@ -30,6 +31,9 @@ app.include_router(timeline.router, prefix="/api")
 app.include_router(mspdi.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(company_settings.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(companies.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 app.include_router(stoerungen.router, prefix="/api/v1")
 app.include_router(behinderungsanzeigen.router, prefix="/api/v1")

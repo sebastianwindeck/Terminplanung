@@ -21,10 +21,31 @@ class ProjectUpdate(BaseModel):
     project_number: Optional[str] = None
 
 
+class ProjectMasterDataUpdate(BaseModel):
+    client_name: Optional[str] = None
+    client_address: Optional[str] = None
+    construction_site_address: Optional[str] = None
+    contract_number: Optional[str] = None
+    contract_date: Optional[date] = None
+    trade: Optional[str] = None
+    construction_lead: Optional[str] = None
+    site_manager: Optional[str] = None
+    vob_b_agreed: Optional[bool] = None
+
+
 class ProjectResponse(ProjectBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    client_name: Optional[str] = None
+    client_address: Optional[str] = None
+    construction_site_address: Optional[str] = None
+    contract_number: Optional[str] = None
+    contract_date: Optional[date] = None
+    trade: Optional[str] = None
+    construction_lead: Optional[str] = None
+    site_manager: Optional[str] = None
+    vob_b_agreed: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
     version_count: int = 0

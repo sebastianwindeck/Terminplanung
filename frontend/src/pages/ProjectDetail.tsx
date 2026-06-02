@@ -10,10 +10,12 @@ import Modal from "@/components/Modal";
 import ChronologyTimeline from "@/components/timeline/ChronologyTimeline";
 import EmailEventList from "@/components/emails/EmailEventList";
 import SequentialComparisonView from "@/components/comparison/SequentialComparisonView";
+import DailyReportListPage from "@/pages/bautagesberichte/DailyReportListPage";
+import ProjectMasterDataPage from "@/pages/ProjectMasterDataPage";
 import type { ScheduleVersion } from "@/types";
 import { SHIFT_REASONS } from "@/types";
 
-type ProjectTab = "versions" | "emails" | "compare";
+type ProjectTab = "versions" | "emails" | "compare" | "bautagesberichte" | "stammdaten";
 
 type FormState = { name: string; description: string; is_baseline: boolean; shift_reason: string; shift_description: string };
 
@@ -162,8 +164,8 @@ export default function ProjectDetail() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {(["versions", "emails", "compare"] as ProjectTab[]).map((tab) => {
-          const labels: Record<ProjectTab, string> = { versions: "Versionen", emails: "E-Mails", compare: "Vergleich" };
+        {(["versions", "emails", "compare", "bautagesberichte", "stammdaten"] as ProjectTab[]).map((tab) => {
+          const labels: Record<ProjectTab, string> = { versions: "Versionen", emails: "E-Mails", compare: "Vergleich", bautagesberichte: "Bautagesberichte", stammdaten: "Stammdaten" };
           return (
             <button
               key={tab}
@@ -187,6 +189,14 @@ export default function ProjectDetail() {
 
       {activeTab === "compare" && (
         <SequentialComparisonView projectId={id} versions={versions} />
+      )}
+
+      {activeTab === "bautagesberichte" && (
+        <DailyReportListPage />
+      )}
+
+      {activeTab === "stammdaten" && (
+        <ProjectMasterDataPage projectId={id} />
       )}
 
       {activeTab === "versions" && (

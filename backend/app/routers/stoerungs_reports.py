@@ -4,10 +4,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Stoerung
 from app.services.pdf_stoerung import render_stoerungsakte_pdf
 
-router = APIRouter(prefix="/stoerungen", tags=["stoerungen-reports"])
+router = APIRouter(prefix="/stoerungen", tags=["stoerungen-reports"], dependencies=[Depends(require_authenticated)])
 
 LOAD_OPTS = [
     selectinload(Stoerung.anzeigen),

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.constants.dropdowns import all_dropdowns
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Project, Stoerung
 from app.schemas_stoerung import (
     StatusTransition,
@@ -21,8 +22,10 @@ from app.services.stoerung_compute import (
     next_stoerung_number,
 )
 from app.services.stoerung_immutable import assert_stoerung_editable
+from app.models import AuditLog
+from app.audit import log_action
 
-router = APIRouter(prefix="/stoerungen", tags=["stoerungen"])
+router = APIRouter(prefix="/stoerungen", tags=["stoerungen"], dependencies=[Depends(require_authenticated)])
 
 LOAD_OPTS = [
     selectinload(Stoerung.anzeigen),
@@ -100,9 +103,9 @@ def create_stoerung(payload: StoerungCreate, db: Session = Depends(get_db)) -> S
     data["stoerung_number"] = number
     s = Stoerung(**data)
     db.add(s)
+    db.flush()
+    log_action(db, "stoerung", s.id, "create", field_changes={"titel": payload.titel})
     db.commit()
-    db.refresh(s)
-    # reload with relationships
     s = _get_stoerung(db, s.id)
     return _to_response(s)
 
@@ -116,8 +119,10 @@ def get_stoerung(stoerung_id: int, db: Session = Depends(get_db)) -> StoerungRes
 def update_stoerung(stoerung_id: int, payload: StoerungUpdate, db: Session = Depends(get_db)) -> StoerungResponse:
     s = _get_stoerung(db, stoerung_id)
     assert_stoerung_editable(s.status)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(s, field, value)
+    log_action(db, "stoerung", stoerung_id, "update", field_changes=changes)
     db.commit()
     s = _get_stoerung(db, stoerung_id)
     return _to_response(s)
@@ -130,7 +135,9 @@ def transition_status(stoerung_id: int, payload: StatusTransition, db: Session =
         assert_transition_allowed(s.status, payload.to_status)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    old_status = s.status
     s.status = payload.to_status
+    log_action(db, "stoerung", stoerung_id, "transition", field_changes={"von": old_status, "nach": payload.to_status})
     db.commit()
     s = _get_stoerung(db, stoerung_id)
     return _to_response(s)
@@ -140,5 +147,27 @@ def transition_status(stoerung_id: int, payload: StatusTransition, db: Session =
 def delete_stoerung(stoerung_id: int, db: Session = Depends(get_db)) -> None:
     s = _get_stoerung(db, stoerung_id)
     assert_stoerung_editable(s.status)
+    log_action(db, "stoerung", stoerung_id, "delete")
     s.deleted_at = datetime.now(timezone.utc)
     db.commit()
+
+
+@router.get("/{stoerung_id}/audit-log")
+def get_audit_log(stoerung_id: int, db: Session = Depends(get_db)) -> list[dict]:
+    from sqlalchemy import select as sa_select
+    logs = db.scalars(
+        sa_select(AuditLog)
+        .where(AuditLog.entity_type == "stoerung", AuditLog.entity_id == stoerung_id)
+        .order_by(AuditLog.timestamp.desc())
+    ).all()
+    import json as _json
+    return [
+        {
+            "id": log.id,
+            "action": log.action,
+            "user_email": log.user_email,
+            "timestamp": log.timestamp.isoformat(),
+            "field_changes": _json.loads(log.field_changes) if log.field_changes else None,
+        }
+        for log in logs
+    ]

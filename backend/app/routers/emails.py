@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 from ..services import storage
 
-router = APIRouter(tags=["emails"])
+router = APIRouter(tags=["emails"], dependencies=[Depends(require_authenticated)])
 
 _ATTACHMENT_KIND_MAP = {".eml": "eml", ".msg": "msg", ".pdf": "pdf"}
 

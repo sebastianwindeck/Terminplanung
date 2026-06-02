@@ -3,8 +3,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 
-router = APIRouter(prefix="/versions", tags=["versions"])
+router = APIRouter(prefix="/versions", tags=["versions"], dependencies=[Depends(require_authenticated)])
 
 
 def _version_response(v: models.ScheduleVersion, db: Session) -> schemas.VersionResponse:

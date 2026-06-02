@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 from ..services.mspdi import parse_mspdi, generate_mspdi
 
-router = APIRouter(prefix="/mspdi", tags=["mspdi"])
+router = APIRouter(prefix="/mspdi", tags=["mspdi"], dependencies=[Depends(require_authenticated)])
 
 
 @router.post("/import", response_model=schemas.MSPDIImportResult, status_code=status.HTTP_201_CREATED)

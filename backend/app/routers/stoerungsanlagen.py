@@ -7,11 +7,12 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Stoerung, Stoerungsanlage
 from app.schemas_stoerung import StoerungsanlageResponse
 from app.services.storage import delete_file, resolve_path, save_file
 
-router = APIRouter(prefix="/stoerungsanlagen", tags=["stoerungsanlagen"])
+router = APIRouter(prefix="/stoerungsanlagen", tags=["stoerungsanlagen"], dependencies=[Depends(require_authenticated)])
 
 SUBDIR = "stoerungsanlagen"
 

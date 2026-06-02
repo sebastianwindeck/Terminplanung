@@ -1,4 +1,19 @@
 import axios from "axios";
+
+const TOKEN_KEY = "tp_auth_token";
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function storeToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 import type {
   Project,
   ScheduleVersion,
@@ -11,9 +26,16 @@ import type {
   SequentialComparisonResponse,
   GeneratedReport,
   MSPDIImportResult,
+  Bautagesbericht,
 } from "@/types";
 
 const api = axios.create({ baseURL: "/api" });
+
+api.interceptors.request.use((config) => {
+  const token = getStoredToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +44,8 @@ export const projectsApi = {
   get: (id: number) => api.get<Project>(`/projects/${id}`).then((r) => r.data),
   create: (data: Partial<Project>) => api.post<Project>("/projects/", data).then((r) => r.data),
   update: (id: number, data: Partial<Project>) => api.put<Project>(`/projects/${id}`, data).then((r) => r.data),
+  updateMasterData: (id: number, data: Partial<Project>) =>
+    api.patch<Project>(`/projects/${id}/master-data`, data).then((r) => r.data),
   delete: (id: number) => api.delete(`/projects/${id}`),
 };
 
@@ -122,6 +146,21 @@ export const reportsApi = {
     api.get<GeneratedReport[]>(`/projects/${projectId}/reports`).then((r) => r.data),
   downloadUrl: (reportId: number) => `/api/reports/${reportId}/download`,
   delete: (reportId: number) => api.delete(`/reports/${reportId}`),
+};
+
+// ── Bautagesberichte ──────────────────────────────────────────────────────────
+
+export const bautagesberichteApi = {
+  listForProject: (projectId: number) =>
+    api.get<Bautagesbericht[]>("/bautagesberichte", { params: { project_id: projectId } }).then((r) => r.data),
+  get: (id: number) => api.get<Bautagesbericht>(`/bautagesberichte/${id}`).then((r) => r.data),
+  create: (data: Partial<Bautagesbericht> & { project_id: number; datum: string }) =>
+    api.post<Bautagesbericht>("/bautagesberichte", data).then((r) => r.data),
+  update: (id: number, data: Partial<Bautagesbericht>) =>
+    api.patch<Bautagesbericht>(`/bautagesberichte/${id}`, data).then((r) => r.data),
+  freigeben: (id: number) =>
+    api.post<Bautagesbericht>(`/bautagesberichte/${id}/freigeben`).then((r) => r.data),
+  delete: (id: number) => api.delete(`/bautagesberichte/${id}`),
 };
 
 // ── Company Settings ──────────────────────────────────────────────────────────

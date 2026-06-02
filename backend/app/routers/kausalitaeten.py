@@ -3,10 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Kausalitaet, Stoerung
 from app.schemas_stoerung import KausalitaetCreate, KausalitaetResponse, KausalitaetUpdate
 
-router = APIRouter(prefix="/kausalitaeten", tags=["kausalitaeten"])
+router = APIRouter(prefix="/kausalitaeten", tags=["kausalitaeten"], dependencies=[Depends(require_authenticated)])
 
 
 def _get(db: Session, kausalitaet_id: int) -> Kausalitaet:

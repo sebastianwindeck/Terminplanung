@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Behinderungsanzeige, Stoerung
 from app.schemas_stoerung import (
     BehinderungsanzeigeCreate,
@@ -11,7 +12,7 @@ from app.schemas_stoerung import (
 )
 from app.services.stoerung_immutable import assert_anzeige_not_locked
 
-router = APIRouter(prefix="/behinderungsanzeigen", tags=["behinderungsanzeigen"])
+router = APIRouter(prefix="/behinderungsanzeigen", tags=["behinderungsanzeigen"], dependencies=[Depends(require_authenticated)])
 
 
 def _get_anzeige(db: Session, anzeige_id: int) -> Behinderungsanzeige:

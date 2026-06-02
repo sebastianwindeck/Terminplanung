@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 from ..services import storage
 
-router = APIRouter(prefix="/company-settings", tags=["company-settings"])
+router = APIRouter(prefix="/company-settings", tags=["company-settings"], dependencies=[Depends(require_authenticated)])
 
 _ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 _ALLOWED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/svg+xml"}

@@ -5,16 +5,59 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    primary_color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    logo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    users: Mapped[list["User"]] = relationship("User", back_populates="company", cascade="all, delete-orphan")
+    projects: Mapped[list["Project"]] = relationship("Project", back_populates="company", cascade="all, delete-orphan")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False)  # main_admin | company_admin | company_user
+    company_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    company: Mapped[Optional["Company"]] = relationship("Company", back_populates="users")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    company_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     project_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # Modul A – Projektstammdaten
+    client_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    client_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    construction_site_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contract_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    contract_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    trade: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="Fassadenbau")
+    construction_lead: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    site_manager: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    vob_b_agreed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    company: Mapped[Optional["Company"]] = relationship("Company", back_populates="projects")
     versions: Mapped[list["ScheduleVersion"]] = relationship("ScheduleVersion", back_populates="project", cascade="all, delete-orphan")
     email_events: Mapped[list["EmailEvent"]] = relationship("EmailEvent", back_populates="project", cascade="all, delete-orphan")
 
@@ -115,6 +158,22 @@ class CompanySettings(Base):
     secondary_color: Mapped[str] = mapped_column(String(7), nullable=False, default="#64748b")
     default_font: Mapped[str] = mapped_column(String(50), nullable=False, default="Helvetica")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)  # create | update | delete | transition
+    field_changes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON
+    user_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index("ix_audit_entity", "entity_type", "entity_id"),
+    )
 
 
 class GeneratedReport(Base):

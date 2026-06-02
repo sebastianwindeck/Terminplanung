@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
+from ..services.auth_service import require_authenticated
 
-router = APIRouter(prefix="/positions", tags=["positions"])
+router = APIRouter(prefix="/positions", tags=["positions"], dependencies=[Depends(require_authenticated)])
 
 STATUS_VALUES = {"planned", "in_progress", "completed", "delayed", "cancelled"}
 

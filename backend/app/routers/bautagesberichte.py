@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.services.auth_service import require_authenticated
 from app.models import Bautagesbericht, Project
 from app.schemas_stoerung import (
     BautagesberichtCreate,
@@ -10,7 +11,7 @@ from app.schemas_stoerung import (
     BautagesberichtUpdate,
 )
 
-router = APIRouter(prefix="/bautagesberichte", tags=["bautagesberichte"])
+router = APIRouter(prefix="/bautagesberichte", tags=["bautagesberichte"], dependencies=[Depends(require_authenticated)])
 
 
 def _get_bericht(db: Session, bericht_id: int) -> Bautagesbericht:
