@@ -10,11 +10,11 @@ from ..database import get_db
 from ..services.auth_service import require_authenticated
 from ..services import storage
 
-router = APIRouter(prefix="/company-settings", tags=["company-settings"], dependencies=[Depends(require_authenticated)])
+router = APIRouter(prefix="/company-settings", tags=["company-settings"])
 
 _ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
 _ALLOWED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/svg+xml"}
-_MAX_LOGO_BYTES = 2 * 1024 * 1024
+_MAX_LOGO_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def _get_or_create_settings(db: Session) -> models.CompanySettings:
@@ -33,12 +33,12 @@ def _to_response(s: models.CompanySettings) -> schemas.CompanySettingsResponse:
     return r
 
 
-@router.get("", response_model=schemas.CompanySettingsResponse)
+@router.get("", response_model=schemas.CompanySettingsResponse, dependencies=[Depends(require_authenticated)])
 def get_settings(db: Session = Depends(get_db)) -> schemas.CompanySettingsResponse:
     return _to_response(_get_or_create_settings(db))
 
 
-@router.put("", response_model=schemas.CompanySettingsResponse)
+@router.put("", response_model=schemas.CompanySettingsResponse, dependencies=[Depends(require_authenticated)])
 def update_settings(
     data: schemas.CompanySettingsUpdate,
     db: Session = Depends(get_db),
@@ -52,7 +52,7 @@ def update_settings(
     return _to_response(settings)
 
 
-@router.post("/logo", response_model=schemas.CompanySettingsResponse)
+@router.post("/logo", response_model=schemas.CompanySettingsResponse, dependencies=[Depends(require_authenticated)])
 def upload_logo(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -80,7 +80,7 @@ def upload_logo(
     return _to_response(settings)
 
 
-@router.delete("/logo", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/logo", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_authenticated)])
 def delete_logo(db: Session = Depends(get_db)) -> None:
     settings = _get_or_create_settings(db)
     if settings.logo_stored_path:

@@ -210,7 +210,13 @@ export default function CompanySettingsPage() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) logoUploadMutation.mutate(f);
+                if (!f) return;
+                if (f.size > 10 * 1024 * 1024) {
+                  toast.error("Datei zu groß – max. 10 MB erlaubt");
+                  e.target.value = "";
+                  return;
+                }
+                logoUploadMutation.mutate(f);
               }}
             />
             <button
@@ -222,7 +228,7 @@ export default function CompanySettingsPage() {
               <Upload className="w-4 h-4" />
               {logoUploadMutation.isPending ? "Hochlädt…" : settings?.has_logo ? "Logo ersetzen" : "Logo hochladen"}
             </button>
-            <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG</p>
+            <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG · max. 10 MB</p>
           </div>
         </div>
 
