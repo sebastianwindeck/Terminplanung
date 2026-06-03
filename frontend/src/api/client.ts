@@ -6,6 +6,20 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export async function downloadWithAuth(url: string, filename: string): Promise<void> {
+  const token = getStoredToken();
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`Download fehlgeschlagen (${res.status})`);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export function storeToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
 }

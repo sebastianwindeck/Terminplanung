@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { FileDown, RefreshCw } from "lucide-react";
-import { reportsApi } from "@/api/client";
+import { reportsApi, downloadWithAuth } from "@/api/client";
 import type { ScheduleVersion, SequentialComparisonResponse } from "@/types";
 import ComparisonStepCard from "./ComparisonStepCard";
 
@@ -29,9 +29,13 @@ export default function SequentialComparisonView({ projectId, versions }: Props)
 
   const pdfMutation = useMutation({
     mutationFn: () => reportsApi.generatePdf(projectId, selectedVersionIds),
-    onSuccess: (report) => {
-      toast.success("PDF wird heruntergeladen…");
-      window.open(reportsApi.downloadUrl(report.id), "_blank");
+    onSuccess: async (report) => {
+      try {
+        await downloadWithAuth(reportsApi.downloadUrl(report.id), report.filename);
+        toast.success("PDF heruntergeladen");
+      } catch {
+        toast.error("Download fehlgeschlagen");
+      }
     },
     onError: () => toast.error("Fehler beim Generieren des PDFs"),
   });
