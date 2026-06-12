@@ -6,6 +6,7 @@ import CausalityMatrix from "@/components/stoerungen/CausalityMatrix";
 import AuditLogTimeline from "@/components/stoerungen/AuditLogTimeline";
 import { DisruptionStatusBadge } from "@/components/stoerungen/DisruptionStatusBadge";
 import { EvidenceTrafficLight } from "@/components/stoerungen/EvidenceTrafficLight";
+import { aiApi } from "@/api/client";
 import type { StoerungStatus } from "@/types/stoerung";
 
 type Tab = "uebersicht" | "anzeigen" | "anlagen" | "kausalitaet" | "protokoll";
@@ -35,6 +36,8 @@ export default function DisruptionDetailPage() {
   const [tab, setTab] = useState<Tab>("uebersicht");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTyp, setUploadTyp] = useState("sonstiges");
+  const [aiText, setAiText] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const { data: stoerung, isLoading } = useQuery({
     queryKey: ["stoerung", stoerungId],
@@ -183,12 +186,46 @@ export default function DisruptionDetailPage() {
 
       {tab === "anzeigen" && (
         <div className="space-y-4">
-          <Link
-            to={`/behinderungsanzeigen/neu?stoerung_id=${stoerungId}`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-700 text-white rounded text-sm hover:bg-primary-800"
-          >
-            + Neue Anzeige
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              to={`/behinderungsanzeigen/neu?stoerung_id=${stoerungId}`}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary-700 text-white rounded text-sm hover:bg-primary-800"
+            >
+              + Neue Anzeige
+            </Link>
+            <button
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-sm hover:bg-violet-700 disabled:opacity-50"
+              disabled={aiLoading}
+              onClick={async () => {
+                setAiLoading(true);
+                setAiText(null);
+                try {
+                  const res = await aiApi.generateVobText(stoerungId);
+                  setAiText(res.text);
+                } catch {
+                  setAiText("Fehler beim Generieren des Textes. Bitte ANTHROPIC_API_KEY prüfen.");
+                } finally {
+                  setAiLoading(false);
+                }
+              }}
+            >
+              {aiLoading ? "⏳ Generiert…" : "✨ KI VOB-Text generieren"}
+            </button>
+          </div>
+          {aiText && (
+            <div className="border border-violet-200 rounded-lg bg-violet-50 p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">KI-generierter VOB/B-Text</span>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(aiText); }}
+                  className="text-xs text-violet-600 hover:text-violet-800"
+                >
+                  In Zwischenablage
+                </button>
+              </div>
+              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{aiText}</pre>
+            </div>
+          )}
           {anzeigen?.map((a) => (
             <div key={a.id} className="border border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-start">

@@ -1,3 +1,11 @@
+# =============================================================================
+# docker-compose.yml – LOCAL DEVELOPMENT (SQLite)
+# For production with PostgreSQL, use azure-deploy.sh or set DATABASE_URL.
+#
+# Usage:
+#   docker compose up -d
+#   open http://localhost
+# =============================================================================
 services:
   backend:
     build: ./backend
@@ -23,9 +31,10 @@ services:
     container_name: terminplanung-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   db_data:

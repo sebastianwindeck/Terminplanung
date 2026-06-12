@@ -1,5 +1,5 @@
 import io
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 from typing import Optional
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
@@ -25,6 +25,13 @@ def _parse_date(val) -> Optional[date]:
         except ValueError:
             continue
     return None
+
+
+def _get_position(db: Session, position_id: int) -> models.SchedulePosition:
+    pos = db.query(models.SchedulePosition).filter(models.SchedulePosition.id == position_id).first()
+    if not pos:
+        raise HTTPException(status_code=404, detail="Position nicht gefunden")
+    return pos
 
 
 @router.get("/version/{version_id}", response_model=list[schemas.PositionResponse])
@@ -240,3 +247,39 @@ def export_positions(version_id: int, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── Behinderungsmanagement ────────────────────────────────────────────────────
+
+@router.post("/{position_id}/behinderung/start", response_model=schemas.PositionResponse)
+def start_behinderung(position_id: int, db: Session = Depends(get_db)):
+    pos = _get_position(db, position_id)
+    if pos.behinderung_aktiv:
+        raise HTTPException(status_code=400, detail="Behinderung bereits aktiv")
+    pos.behinderung_aktiv = True
+    pos.behinderung_beginn = datetime.now(timezone.utc).replace(tzinfo=None)
+    if pos.status not in ("completed", "cancelled"):
+        pos.status = "delayed"
+    db.commit()
+    db.refresh(pos)
+    return pos
+
+
+@router.post("/{position_id}/behinderung/end", response_model=schemas.PositionResponse)
+def end_behinderung(position_id: int, db: Session = Depends(get_db)):
+    pos = _get_position(db, position_id)
+    if not pos.behinderung_aktiv:
+        raise HTTPException(status_code=400, detail="Keine aktive Behinderung")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    delta_days = max(1, (now - pos.behinderung_beginn).days) if pos.behinderung_beginn else 1
+    pos.behinderung_tage_gesamt += delta_days
+    pos.behinderung_aktiv = False
+    pos.behinderung_beginn = None
+    db.commit()
+    db.refresh(pos)
+    return pos
+
+
+@router.get("/{position_id}", response_model=schemas.PositionResponse)
+def get_position(position_id: int, db: Session = Depends(get_db)):
+    return _get_position(db, position_id)

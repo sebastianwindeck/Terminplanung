@@ -1,0 +1,99 @@
+name: __ACI_GROUP_NAME__
+apiVersion: "2021-10-01"
+location: __AZURE_LOCATION__
+tags:
+  project: terminplanung
+
+properties:
+  osType: Linux
+  restartPolicy: Always
+
+  imageRegistryCredentials:
+    - server:   __ACR_SERVER__
+      username: __ACR_USER__
+      password: __ACR_PASS__
+
+  ipAddress:
+    type: Public
+    dnsNameLabel: __ACI_DNS_LABEL__
+    ports:
+      - port: 80
+        protocol: TCP
+      - port: 443
+        protocol: TCP
+
+  containers:
+
+    # ── Backend (FastAPI) ─────────────────────────────────────────────────────
+    - name: backend
+      properties:
+        image: __ACR_SERVER__/terminplanung-backend:latest
+        resources:
+          requests:
+            cpu: 0.5
+            memoryInGb: 1.0
+        ports:
+          - port: 8000
+            protocol: TCP
+        environmentVariables:
+          - name:        DATABASE_URL
+            secureValue: "__DATABASE_URL__"
+          - name:        SECRET_KEY
+            secureValue: "__SECRET_KEY__"
+          - name:        ANTHROPIC_API_KEY
+            secureValue: "__ANTHROPIC_API_KEY__"
+          - name:  ALLOWED_ORIGINS
+            value: '__ALLOWED_ORIGINS__'
+          - name:  STORAGE_ROOT
+            value: /app/storage
+        volumeMounts:
+          - name:      app-storage
+            mountPath: /app/storage
+
+    # ── Frontend (nginx on internal port 8080) ────────────────────────────────
+    - name: frontend
+      properties:
+        image: __ACR_SERVER__/terminplanung-frontend:latest
+        resources:
+          requests:
+            cpu: 0.25
+            memoryInGb: 0.5
+
+    # ── Caddy (TLS + reverse proxy) ───────────────────────────────────────────
+    - name: caddy
+      properties:
+        image: caddy:2-alpine
+        command: ["caddy", "run", "--config", "/etc/caddy/caddy.json"]
+        resources:
+          requests:
+            cpu: 0.25
+            memoryInGb: 0.5
+        ports:
+          - port: 80
+            protocol: TCP
+          - port: 443
+            protocol: TCP
+        volumeMounts:
+          - name:      caddy-config
+            mountPath: /etc/caddy
+          - name:      caddy-data
+            mountPath: /data
+
+  volumes:
+    - name: app-storage
+      azureFile:
+        shareName:          app-storage
+        storageAccountName: __STORAGE_ACCOUNT_NAME__
+        storageAccountKey:  __STORAGE_ACCOUNT_KEY__
+
+    - name: caddy-config
+      azureFile:
+        shareName:          caddy-config
+        storageAccountName: __STORAGE_ACCOUNT_NAME__
+        storageAccountKey:  __STORAGE_ACCOUNT_KEY__
+
+    - name: caddy-data
+      azureFile:
+        shareName:          caddy-data
+        storageAccountName: __STORAGE_ACCOUNT_NAME__
+        storageAccountKey:  __STORAGE_ACCOUNT_KEY__

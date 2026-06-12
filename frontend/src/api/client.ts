@@ -41,6 +41,7 @@ import type {
   GeneratedReport,
   MSPDIImportResult,
   Bautagesbericht,
+  DashboardResponse,
 } from "@/types";
 
 const api = axios.create({ baseURL: "/api" });
@@ -175,6 +176,37 @@ export const bautagesberichteApi = {
   freigeben: (id: number) =>
     api.post<Bautagesbericht>(`/bautagesberichte/${id}/freigeben`).then((r) => r.data),
   delete: (id: number) => api.delete(`/bautagesberichte/${id}`),
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+export const dashboardApi = {
+  get: (days: number = 14) =>
+    api.get<DashboardResponse>("/dashboard", { params: { days } }).then((r) => r.data),
+};
+
+// ── Positions (Behinderung) ───────────────────────────────────────────────────
+
+export const positionBehinderungApi = {
+  start: (positionId: number) =>
+    api.post<SchedulePosition>(`/positions/${positionId}/behinderung/start`).then((r) => r.data),
+  end: (positionId: number) =>
+    api.post<SchedulePosition>(`/positions/${positionId}/behinderung/end`).then((r) => r.data),
+  get: (positionId: number) =>
+    api.get<SchedulePosition>(`/positions/${positionId}`).then((r) => r.data),
+};
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+
+export const aiApi = {
+  generateVobText: (stoerungId: number, behinderungsanzeigeId?: number, hinweis?: string) =>
+    api
+      .post<{ text: string; model: string }>("/v1/ai/vob-text", {
+        stoerung_id: stoerungId,
+        behinderungsanzeige_id: behinderungsanzeigeId ?? null,
+        hinweis: hinweis ?? null,
+      })
+      .then((r) => r.data),
 };
 
 // ── Company Settings ──────────────────────────────────────────────────────────

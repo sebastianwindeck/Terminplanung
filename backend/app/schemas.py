@@ -46,6 +46,7 @@ class ProjectResponse(ProjectBase):
     construction_lead: Optional[str] = None
     site_manager: Optional[str] = None
     vob_b_agreed: Optional[bool] = None
+    email_token: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     version_count: int = 0
@@ -98,6 +99,7 @@ class PositionBase(BaseModel):
     duration_days: Optional[int] = None
     responsible: Optional[str] = None
     trade: Optional[str] = None
+    typ: str = "vorgang"
     status: str = "planned"
     progress: float = 0.0
     sort_order: int = 0
@@ -119,6 +121,7 @@ class PositionUpdate(BaseModel):
     duration_days: Optional[int] = None
     responsible: Optional[str] = None
     trade: Optional[str] = None
+    typ: Optional[str] = None
     status: Optional[str] = None
     progress: Optional[float] = None
     sort_order: Optional[int] = None
@@ -132,6 +135,9 @@ class PositionResponse(PositionBase):
 
     id: int
     version_id: int
+    behinderung_aktiv: bool = False
+    behinderung_beginn: Optional[datetime] = None
+    behinderung_tage_gesamt: int = 0
     created_at: datetime
     updated_at: datetime
 

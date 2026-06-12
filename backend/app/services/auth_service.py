@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+from app.config import settings
 
-SECRET_KEY = "change-me-in-production-use-env-var"
+SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 

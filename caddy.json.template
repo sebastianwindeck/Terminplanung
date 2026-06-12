@@ -1,0 +1,82 @@
+{
+  "admin": { "disabled": true },
+  "apps": {
+    "http": {
+      "servers": {
+        "http_redirect": {
+          "listen": [":80"],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "static_response",
+                  "headers": {
+                    "Location": ["https://{http.request.host}{http.request.uri}"]
+                  },
+                  "status_code": 301
+                }
+              ]
+            }
+          ]
+        },
+        "https": {
+          "listen": [":443"],
+          "automatic_https": { "disable_redirects": true },
+          "routes": [
+            {
+              "match": [{ "host": ["__APP_DOMAIN__"] }],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "match": [{ "path": ["/api/*"] }],
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [{ "dial": "localhost:8000" }],
+                          "headers": {
+                            "request": {
+                              "set": {
+                                "X-Forwarded-Proto": ["https"],
+                                "X-Real-IP":         ["{http.request.remote.host}"]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [{ "dial": "localhost:8080" }]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "tls_connection_policies": [{}]
+        }
+      }
+    },
+    "tls": {
+      "automation": {
+        "policies": [
+          {
+            "subjects": ["__APP_DOMAIN__"],
+            "issuers": [
+              {
+                "module": "acme",
+                "email":  "__LETSENCRYPT_EMAIL__"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

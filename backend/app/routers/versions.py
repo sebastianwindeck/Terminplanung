@@ -1,3 +1,4 @@
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -56,21 +57,30 @@ def create_version(data: schemas.VersionCreate, db: Session = Depends(get_db)):
         id_map: dict[int, int] = {}
         sorted_positions = sorted(source.positions, key=lambda p: (p.sort_order, p.id))
         for pos in sorted_positions:
+            # Shift dates forward by accumulated behinderung days
+            shift = timedelta(days=pos.behinderung_tage_gesamt) if pos.behinderung_tage_gesamt else timedelta(0)
+            new_start = (pos.start_date + shift) if pos.start_date and shift.days > 0 else pos.start_date
+            new_end = (pos.end_date + shift) if pos.end_date and shift.days > 0 else pos.end_date
             new_pos = models.SchedulePosition(
                 version_id=version.id,
                 pos_number=pos.pos_number,
                 title=pos.title,
                 description=pos.description,
-                start_date=pos.start_date,
-                end_date=pos.end_date,
+                start_date=new_start,
+                end_date=new_end,
                 duration_days=pos.duration_days,
                 responsible=pos.responsible,
                 trade=pos.trade,
-                status=pos.status,
+                typ=pos.typ,
+                status="planned" if pos.status in ("delayed",) else pos.status,
                 progress=pos.progress,
                 sort_order=pos.sort_order,
                 is_milestone=pos.is_milestone,
                 color=pos.color,
+                # Reset behinderung tracking in new version
+                behinderung_aktiv=False,
+                behinderung_beginn=None,
+                behinderung_tage_gesamt=0,
             )
             db.add(new_pos)
             db.flush()

@@ -1,0 +1,57 @@
+# =============================================================================
+# docker-compose.pg.yml – LOCAL DEVELOPMENT with PostgreSQL
+#
+# Usage:
+#   cp .env.example .env && nano .env
+#   docker compose -f docker-compose.pg.yml up -d
+# =============================================================================
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${PG_DB:-terminplanung}
+      POSTGRES_USER:     ${PG_USER:-terminplanung}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-terminplanung_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-terminplanung}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: terminplanung-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - terminplanung_storage:/app/storage
+    environment:
+      - DATABASE_URL=postgresql://${PG_USER:-terminplanung}:${PG_PASSWORD:-terminplanung_dev}@db:5432/${PG_DB:-terminplanung}
+      - ALLOWED_ORIGINS=["http://localhost", "http://localhost:80"]
+      - STORAGE_ROOT=/app/storage
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: terminplanung-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  terminplanung_storage:

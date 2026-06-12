@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, date
 from typing import Optional
 from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, Float, Boolean, Text, UniqueConstraint, Index
@@ -54,6 +55,7 @@ class Project(Base):
     construction_lead: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     site_manager: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     vob_b_agreed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    email_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -100,11 +102,16 @@ class SchedulePosition(Base):
     duration_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     responsible: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     trade: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    typ: Mapped[str] = mapped_column(String(30), nullable=False, default="vorgang")  # vorgang | meilenstein | sammelvorgang
     status: Mapped[str] = mapped_column(String(50), default="planned")
     progress: Mapped[float] = mapped_column(Float, default=0.0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_milestone: Mapped[bool] = mapped_column(Boolean, default=False)
     color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Behinderungsmanagement
+    behinderung_aktiv: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    behinderung_beginn: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    behinderung_tage_gesamt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

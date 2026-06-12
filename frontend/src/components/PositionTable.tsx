@@ -12,6 +12,7 @@ import PositionEditModal from "./PositionEditModal";
 interface Props {
   positions: SchedulePosition[];
   versionId: number;
+  onRowClick?: (pos: SchedulePosition) => void;
 }
 
 function fmtDate(d?: string) {
@@ -20,7 +21,7 @@ function fmtDate(d?: string) {
   catch { return d; }
 }
 
-export default function PositionTable({ positions, versionId }: Props) {
+export default function PositionTable({ positions, versionId, onRowClick }: Props) {
   const [editId, setEditId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const qc = useQueryClient();
@@ -54,18 +55,28 @@ export default function PositionTable({ positions, versionId }: Props) {
     const kids = childrenOf(pos.id);
     const isCollapsed = collapsed.has(pos.id);
     return [
-      <tr key={pos.id} className="hover:bg-gray-50 group">
+      <tr
+        key={pos.id}
+        className={`group cursor-pointer transition-colors ${
+          pos.behinderung_aktiv ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50"
+        }`}
+        onClick={() => onRowClick?.(pos)}
+      >
         <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap w-20">{pos.pos_number || "–"}</td>
         <td className="px-3 py-2">
           <div className="flex items-center gap-1" style={{ paddingLeft: depth * 20 }}>
             {kids.length > 0 ? (
-              <button onClick={() => toggle(pos.id)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={(e) => { e.stopPropagation(); toggle(pos.id); }} className="text-gray-400 hover:text-gray-600">
                 {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             ) : (
               <span className="w-3.5 h-3.5 inline-block" />
             )}
             {pos.is_milestone && <Star className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />}
+            {pos.behinderung_aktiv && <span className="text-red-500 text-xs font-bold" title="Behinderung aktiv">⚠</span>}
+            {pos.behinderung_tage_gesamt > 0 && !pos.behinderung_aktiv && (
+              <span className="text-orange-400 text-xs" title={`${pos.behinderung_tage_gesamt} Verzugtage angesammelt`}>+{pos.behinderung_tage_gesamt}T</span>
+            )}
             <span className={`text-sm ${depth === 0 ? "font-medium" : ""}`}>{pos.title}</span>
           </div>
         </td>
@@ -92,11 +103,11 @@ export default function PositionTable({ positions, versionId }: Props) {
         </td>
         <td className="px-3 py-2">
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => setEditId(pos.id)} className="btn-ghost p-1 rounded" title="Bearbeiten">
+            <button onClick={(e) => { e.stopPropagation(); setEditId(pos.id); }} className="btn-ghost p-1 rounded" title="Bearbeiten">
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => confirmDelete(pos.id, pos.title)}
+              onClick={(e) => { e.stopPropagation(); confirmDelete(pos.id, pos.title); }}
               className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
               title="Löschen"
             >

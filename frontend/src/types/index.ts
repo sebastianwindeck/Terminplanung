@@ -13,6 +13,7 @@ export interface Project {
   construction_lead?: string | null;
   site_manager?: string | null;
   vob_b_agreed?: boolean | null;
+  email_token?: string | null;
   created_at: string;
   updated_at: string;
   version_count: number;
@@ -47,6 +48,14 @@ export const SHIFT_REASONS: { value: string; label: string }[] = [
 
 export type PositionStatus = "planned" | "in_progress" | "completed" | "delayed" | "cancelled";
 
+export type VorgangTyp = "vorgang" | "meilenstein" | "sammelvorgang";
+
+export const VORGANG_TYP_LABELS: Record<VorgangTyp, string> = {
+  vorgang: "Vorgang",
+  meilenstein: "Meilenstein",
+  sammelvorgang: "Sammelvorgang",
+};
+
 export interface SchedulePosition {
   id: number;
   version_id: number;
@@ -59,13 +68,65 @@ export interface SchedulePosition {
   duration_days?: number;
   responsible?: string;
   trade?: string;
+  typ: VorgangTyp;
   status: PositionStatus;
   progress: number;
   sort_order: number;
   is_milestone: boolean;
   color?: string;
+  behinderung_aktiv: boolean;
+  behinderung_beginn?: string | null;
+  behinderung_tage_gesamt: number;
   created_at: string;
   updated_at: string;
+}
+
+// Dashboard
+export interface DashboardPosition {
+  project_id: number;
+  project_name: string;
+  project_number: string | null;
+  position_id: number;
+  pos_number: string | null;
+  title: string;
+  typ: VorgangTyp;
+  start_date: string | null;
+  end_date: string | null;
+  duration_days: number | null;
+  responsible: string | null;
+  status: PositionStatus;
+  behinderung_aktiv: boolean;
+  behinderung_tage_gesamt: number;
+  version_id: number;
+  version_number: number;
+}
+
+export interface DashboardStoerung {
+  id: number;
+  project_id: number;
+  project_name: string;
+  stoerung_number: string;
+  titel: string;
+  stoerungsart: string | null;
+  status: string;
+  stoerungsbeginn: string;
+  kritikalitaet: string | null;
+}
+
+export interface DashboardStats {
+  project_count: number;
+  upcoming_count: number;
+  open_stoerungen_count: number;
+  active_behinderungen: number;
+}
+
+export interface DashboardResponse {
+  days: number;
+  today: string;
+  cutoff: string;
+  upcoming_positions: DashboardPosition[];
+  open_stoerungen: DashboardStoerung[];
+  stats: DashboardStats;
 }
 
 export interface ImportResult {

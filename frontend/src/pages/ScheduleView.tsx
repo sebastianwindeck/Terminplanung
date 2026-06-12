@@ -11,8 +11,10 @@ import ImportDialog from "@/components/ImportDialog";
 import PositionEditModal from "@/components/PositionEditModal";
 import CompareDialog from "@/components/CompareDialog";
 import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
+import VorgangDetailModal from "@/components/VorgangDetailModal";
 import Modal from "@/components/Modal";
 import { SHIFT_REASONS } from "@/types";
+import type { SchedulePosition } from "@/types";
 
 type Tab = "table" | "gantt";
 type GanttView = "Day" | "Week" | "Month";
@@ -43,6 +45,7 @@ export default function ScheduleView() {
   const [showCompare, setShowCompare] = useState(false);
   const [showEditVersion, setShowEditVersion] = useState(false);
   const [shiftForm, setShiftForm] = useState({ shift_reason: "", shift_description: "" });
+  const [selectedPosition, setSelectedPosition] = useState<SchedulePosition | null>(null);
 
   const qc = useQueryClient();
 
@@ -175,12 +178,23 @@ export default function ScheduleView() {
           Lade Positionen…
         </div>
       ) : tab === "table" ? (
-        <PositionTable positions={positions} versionId={vid} />
+        <PositionTable positions={positions} versionId={vid} onRowClick={(pos) => setSelectedPosition(pos)} />
       ) : (
         <div className="card p-4">
           <GanttChart positions={positions} viewMode={GANTT_MODE_MAP[ganttView]} />
         </div>
       )}
+
+      <VorgangDetailModal
+        position={selectedPosition}
+        onClose={() => setSelectedPosition(null)}
+        onUpdated={(updated) => {
+          qc.setQueryData(["positions", vid], (old: SchedulePosition[] | undefined) =>
+            old ? old.map((p) => (p.id === updated.id ? updated : p)) : old
+          );
+          setSelectedPosition(updated);
+        }}
+      />
 
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} versionId={vid} />
       <MSPDIImportDialog open={showMspdiImport} onClose={() => setShowMspdiImport(false)} projectId={pid} />
