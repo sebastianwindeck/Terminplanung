@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare, Pencil } from "lucide-react";
+import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare, Pencil, Lock } from "lucide-react";
 import { ViewMode } from "gantt-task-react";
-import { projectsApi, versionsApi, positionsApi, mspdiApi } from "@/api/client";
+import { projectsApi, versionsApi, positionsApi, mspdiApi, downloadWithAuth } from "@/api/client";
 import GanttChart from "@/components/GanttChart";
 import PositionTable from "@/components/PositionTable";
 import ImportDialog from "@/components/ImportDialog";
+import ExcelImportAsVersionDialog from "@/components/ExcelImportAsVersionDialog";
 import PositionEditModal from "@/components/PositionEditModal";
 import CompareDialog from "@/components/CompareDialog";
 import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
@@ -41,6 +42,7 @@ export default function ScheduleView() {
   const [ganttView, setGanttView] = useState<GanttView>("Week");
   const [showImport, setShowImport] = useState(false);
   const [showMspdiImport, setShowMspdiImport] = useState(false);
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const [showNewPosition, setShowNewPosition] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showEditVersion, setShowEditVersion] = useState(false);
@@ -76,6 +78,8 @@ export default function ScheduleView() {
     setShowEditVersion(true);
   };
 
+  const isBaseVersion = version?.version_number === 1;
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -88,6 +92,11 @@ export default function ScheduleView() {
             <span className="truncate">{project?.name}</span>
             <span>/</span>
             <span className="font-medium text-gray-900 truncate">V{version?.version_number} – {version?.name}</span>
+            {isBaseVersion && (
+              <span className="flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                <Lock className="w-2.5 h-2.5" /> Basisversion
+              </span>
+            )}
             {version?.is_baseline && (
               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">Basis</span>
             )}
@@ -100,7 +109,7 @@ export default function ScheduleView() {
               <Pencil className="w-3.5 h-3.5 text-gray-400" />
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">{positions.length} Positionen</p>
+          <p className="text-xs text-gray-400 mt-0.5">{positions.length} Positionen{isBaseVersion ? " · Nur-Lesen" : ""}</p>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -112,26 +121,31 @@ export default function ScheduleView() {
           <button className="btn-secondary" onClick={() => setShowMspdiImport(true)}>
             <Upload className="w-4 h-4" /> MS Project importieren
           </button>
-          <a
-            href={mspdiApi.exportUrl(vid)}
-            download
+          <button className="btn-secondary" onClick={() => setShowExcelImport(true)}>
+            <Upload className="w-4 h-4" /> Excel importieren
+          </button>
+          <button
             className="btn-secondary"
+            onClick={() => downloadWithAuth(mspdiApi.exportUrl(vid), `Terminplan_V${version?.version_number}.xml`)}
           >
             <Download className="w-4 h-4" /> MS Project exportieren
-          </a>
-          <a
-            href={positionsApi.exportUrl(vid)}
-            download
+          </button>
+          <button
             className="btn-secondary"
+            onClick={() => downloadWithAuth(positionsApi.exportUrl(vid), `Terminplan_V${version?.version_number}.xlsx`)}
           >
             <Download className="w-4 h-4" /> Excel exportieren
-          </a>
-          <button className="btn-secondary" onClick={() => setShowImport(true)}>
-            <Upload className="w-4 h-4" /> Importieren
           </button>
-          <button className="btn-primary" onClick={() => setShowNewPosition(true)}>
-            <Plus className="w-4 h-4" /> Position
-          </button>
+          {!isBaseVersion && (
+            <button className="btn-secondary" onClick={() => setShowImport(true)}>
+              <Upload className="w-4 h-4" /> In Version importieren
+            </button>
+          )}
+          {!isBaseVersion && (
+            <button className="btn-primary" onClick={() => setShowNewPosition(true)}>
+              <Plus className="w-4 h-4" /> Position
+            </button>
+          )}
         </div>
       </div>
 
@@ -178,7 +192,7 @@ export default function ScheduleView() {
           Lade Positionen…
         </div>
       ) : tab === "table" ? (
-        <PositionTable positions={positions} versionId={vid} onRowClick={(pos) => setSelectedPosition(pos)} />
+        <PositionTable positions={positions} versionId={vid} onRowClick={(pos) => setSelectedPosition(pos)} readOnly={isBaseVersion} />
       ) : (
         <div className="card p-4">
           <GanttChart positions={positions} viewMode={GANTT_MODE_MAP[ganttView]} />
@@ -198,6 +212,7 @@ export default function ScheduleView() {
 
       <ImportDialog open={showImport} onClose={() => setShowImport(false)} versionId={vid} />
       <MSPDIImportDialog open={showMspdiImport} onClose={() => setShowMspdiImport(false)} projectId={pid} />
+      <ExcelImportAsVersionDialog open={showExcelImport} onClose={() => setShowExcelImport(false)} projectId={pid} />
 
       {showNewPosition && (
         <PositionEditModal

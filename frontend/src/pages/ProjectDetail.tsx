@@ -2,17 +2,19 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { ArrowLeft, Plus, Copy, Trash2, GitBranch, Star, ChevronRight, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Trash2, GitBranch, Star, ChevronRight, Pencil, Upload, Download } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { projectsApi, versionsApi } from "@/api/client";
+import { projectsApi, versionsApi, downloadWithAuth } from "@/api/client";
 import Modal from "@/components/Modal";
 import ChronologyTimeline from "@/components/timeline/ChronologyTimeline";
 import EmailEventList from "@/components/emails/EmailEventList";
 import SequentialComparisonView from "@/components/comparison/SequentialComparisonView";
 import DailyReportListPage from "@/pages/bautagesberichte/DailyReportListPage";
 import ProjectMasterDataPage from "@/pages/ProjectMasterDataPage";
-import type { ScheduleVersion } from "@/types";
+import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
+import ExcelImportAsVersionDialog from "@/components/ExcelImportAsVersionDialog";
+import type { ScheduleVersion, MSPDIImportResult } from "@/types";
 import { SHIFT_REASONS } from "@/types";
 
 type ProjectTab = "versions" | "emails" | "compare" | "bautagesberichte" | "stammdaten";
@@ -58,6 +60,8 @@ export default function ProjectDetail() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<ProjectTab>("versions");
   const [showCreate, setShowCreate] = useState(false);
+  const [showMspdiImport, setShowMspdiImport] = useState(false);
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const [editVersion, setEditVersion] = useState<ScheduleVersion | null>(null);
   const [cloneFrom, setCloneFrom] = useState<number | "">("");
   const [form, setForm] = useState({ name: "", description: "", is_baseline: false, shift_reason: "", shift_description: "" });
@@ -136,6 +140,10 @@ export default function ProjectDetail() {
     });
   };
 
+  const handleImportSuccess = (result: MSPDIImportResult) => {
+    navigate(`/projects/${id}/versions/${result.version_id}`);
+  };
+
   if (!project && !isLoading) return <div className="text-center text-gray-400 py-16">Projekt nicht gefunden</div>;
 
   return (
@@ -203,12 +211,25 @@ export default function ProjectDetail() {
         isLoading ? (
         <div className="text-center py-16 text-gray-400 text-sm">Lade Versionen…</div>
       ) : versions.length === 0 ? (
-        <div className="card p-16 text-center">
+        <div className="card p-12 text-center">
           <GitBranch className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-gray-700 mb-2">Keine Versionen</h2>
-          <p className="text-gray-400 text-sm mb-6">Erstellen Sie die erste Terminplanversion.</p>
-          <button className="btn-primary" onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4" /> Erste Version erstellen
+          <h2 className="text-lg font-semibold text-gray-700 mb-2">Basisversion importieren</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            Die erste Version ist die unveränderliche Basisversion und wird aus einer Datei importiert.
+          </p>
+          <div className="flex gap-3 justify-center mb-5">
+            <button className="btn-secondary" onClick={() => setShowMspdiImport(true)}>
+              <Upload className="w-4 h-4" /> MS Project (.xml)
+            </button>
+            <button className="btn-primary" onClick={() => setShowExcelImport(true)}>
+              <Upload className="w-4 h-4" /> Excel importieren
+            </button>
+          </div>
+          <button
+            className="text-sm text-primary-600 hover:underline flex items-center gap-1 mx-auto"
+            onClick={() => downloadWithAuth("/api/positions/template", "Terminplan-Vorlage.xlsx")}
+          >
+            <Download className="w-3.5 h-3.5" /> Excel-Vorlage herunterladen
           </button>
         </div>
       ) : (
@@ -321,6 +342,20 @@ export default function ProjectDetail() {
           </div>
         </form>
       </Modal>
+
+      {/* Import dialogs for first version */}
+      <MSPDIImportDialog
+        open={showMspdiImport}
+        onClose={() => setShowMspdiImport(false)}
+        projectId={id}
+        onSuccess={handleImportSuccess}
+      />
+      <ExcelImportAsVersionDialog
+        open={showExcelImport}
+        onClose={() => setShowExcelImport(false)}
+        projectId={id}
+        onSuccess={handleImportSuccess}
+      />
 
       {/* Edit modal */}
       <Modal open={editVersion !== null} onClose={() => setEditVersion(null)} title={`Version bearbeiten: ${editVersion?.name ?? ""}`}>

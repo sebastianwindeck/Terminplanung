@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 # ── Project ──────────────────────────────────────────────────────────────────
@@ -86,6 +86,11 @@ class VersionResponse(VersionBase):
     created_at: datetime
     updated_at: datetime
     position_count: int = 0
+
+    @computed_field
+    @property
+    def is_base_version(self) -> bool:
+        return self.version_number == 1
 
 
 # ── SchedulePosition ──────────────────────────────────────────────────────────

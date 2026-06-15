@@ -26,6 +26,7 @@ export interface ScheduleVersion {
   version_number: number;
   description?: string;
   is_baseline: boolean;
+  is_base_version: boolean;
   is_current: boolean;
   shift_reason?: string;
   shift_description?: string;

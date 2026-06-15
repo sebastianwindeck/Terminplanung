@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Upload, FileCode, AlertTriangle, CheckCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import Modal from "@/components/Modal";
-import { mspdiApi } from "@/api/client";
+import { positionsApi, downloadWithAuth } from "@/api/client";
 import type { MSPDIImportResult } from "@/types";
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
   onSuccess?: (result: MSPDIImportResult) => void;
 }
 
-export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess }: Props) {
+export default function ExcelImportAsVersionDialog({ open, onClose, projectId, onSuccess }: Props) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -23,7 +23,7 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
       if (!file) throw new Error("Keine Datei ausgewählt");
-      return mspdiApi.import(projectId, file, versionName || undefined);
+      return positionsApi.importAsVersion(projectId, file, versionName || undefined);
     },
     onSuccess: (data) => {
       setResult(data);
@@ -31,7 +31,7 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
       toast.success(`${data.positions_created} Positionen importiert`);
       onSuccess?.(data);
     },
-    onError: () => toast.error("Import fehlgeschlagen"),
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Import fehlgeschlagen"),
   });
 
   const handleClose = () => {
@@ -41,17 +41,25 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutate();
-  };
-
   return (
-    <Modal open={open} onClose={handleClose} title="MS Project importieren" size="md">
+    <Modal open={open} onClose={handleClose} title="Excel importieren (neue Version)" size="md">
       <div className="space-y-5">
         {!result ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* File drop zone */}
+          <form onSubmit={(e) => { e.preventDefault(); mutate(); }} className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 flex items-start gap-3">
+              <div className="flex-1">
+                <p className="font-medium mb-1">Excel-Vorlage verwenden</p>
+                <p className="text-xs text-blue-700">Laden Sie die Vorlage herunter, befüllen Sie diese und importieren Sie sie hier.</p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary text-xs px-2 py-1 flex items-center gap-1 flex-shrink-0"
+                onClick={() => downloadWithAuth("/api/positions/template", "Terminplan-Vorlage.xlsx")}
+              >
+                <Download className="w-3 h-3" /> Vorlage
+              </button>
+            </div>
+
             <div
               className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-primary-400 transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
@@ -65,7 +73,7 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xml"
+                accept=".xlsx,.xls,.csv"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -74,34 +82,31 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
               />
               {file ? (
                 <div className="flex flex-col items-center gap-2 text-primary-700">
-                  <FileCode className="w-10 h-10" />
+                  <FileSpreadsheet className="w-10 h-10" />
                   <span className="font-medium text-sm">{file.name}</span>
                   <span className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Upload className="w-10 h-10" />
-                  <span className="font-medium text-sm">MSPDI-Datei hier ablegen oder klicken</span>
-                  <span className="text-xs">.xml (MS Project XML)</span>
+                  <span className="font-medium text-sm">Datei hier ablegen oder klicken</span>
+                  <span className="text-xs">.xlsx, .xls, .csv</span>
                 </div>
               )}
             </div>
 
-            {/* Version name */}
             <div>
               <label className="label">Versionsname (optional)</label>
               <input
                 className="input"
                 value={versionName}
                 onChange={(e) => setVersionName(e.target.value)}
-                placeholder="MS Project Import"
+                placeholder="Basisplanung"
               />
             </div>
 
             <div className="flex justify-end gap-3">
-              <button type="button" className="btn-secondary" onClick={handleClose}>
-                Abbrechen
-              </button>
+              <button type="button" className="btn-secondary" onClick={handleClose}>Abbrechen</button>
               <button type="submit" className="btn-primary" disabled={!file || isPending}>
                 {isPending ? "Importiert…" : "Importieren"}
               </button>
@@ -116,7 +121,6 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
                 <p>{result.positions_created} Positionen erstellt, {result.skipped} übersprungen</p>
               </div>
             </div>
-
             {result.warnings.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-amber-700 mb-2">
@@ -124,17 +128,12 @@ export default function MSPDIImportDialog({ open, onClose, projectId, onSuccess 
                   <span className="text-sm font-medium">{result.warnings.length} Hinweise</span>
                 </div>
                 <ul className="text-xs text-amber-600 space-y-0.5 max-h-40 overflow-y-auto">
-                  {result.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
+                  {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               </div>
             )}
-
             <div className="flex justify-end">
-              <button className="btn-primary" onClick={handleClose}>
-                Schließen
-              </button>
+              <button className="btn-primary" onClick={handleClose}>Schließen</button>
             </div>
           </div>
         )}

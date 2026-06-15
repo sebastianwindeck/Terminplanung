@@ -101,7 +101,15 @@ export const positionsApi = {
     fd.append("file", file);
     return api.post<ImportResult>(`/positions/version/${versionId}/import`, fd).then((r) => r.data);
   },
+  importAsVersion: (projectId: number, file: File, versionName?: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("project_id", String(projectId));
+    if (versionName) fd.append("version_name", versionName);
+    return api.post<MSPDIImportResult>("/positions/import-as-version", fd).then((r) => r.data);
+  },
   exportUrl: (versionId: number) => `/api/positions/version/${versionId}/export`,
+  templateUrl: () => `/api/positions/template`,
 };
 
 // ── Emails ────────────────────────────────────────────────────────────────────

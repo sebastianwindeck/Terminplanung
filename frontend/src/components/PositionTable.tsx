@@ -13,6 +13,7 @@ interface Props {
   positions: SchedulePosition[];
   versionId: number;
   onRowClick?: (pos: SchedulePosition) => void;
+  readOnly?: boolean;
 }
 
 function fmtDate(d?: string) {
@@ -21,7 +22,7 @@ function fmtDate(d?: string) {
   catch { return d; }
 }
 
-export default function PositionTable({ positions, versionId, onRowClick }: Props) {
+export default function PositionTable({ positions, versionId, onRowClick, readOnly = false }: Props) {
   const [editId, setEditId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const qc = useQueryClient();
@@ -101,20 +102,23 @@ export default function PositionTable({ positions, versionId, onRowClick }: Prop
             <span className="text-xs text-gray-500 w-8 text-right">{Math.round(pos.progress * 100)}%</span>
           </div>
         </td>
-        <td className="px-3 py-2">
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={(e) => { e.stopPropagation(); setEditId(pos.id); }} className="btn-ghost p-1 rounded" title="Bearbeiten">
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); confirmDelete(pos.id, pos.title); }}
-              className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
-              title="Löschen"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </td>
+        {!readOnly && (
+          <td className="px-3 py-2">
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={(e) => { e.stopPropagation(); setEditId(pos.id); }} className="btn-ghost p-1 rounded" title="Bearbeiten">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); confirmDelete(pos.id, pos.title); }}
+                className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                title="Löschen"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </td>
+        )}
+        {readOnly && <td className="px-3 py-2 w-10" />}
       </tr>,
       ...(!isCollapsed ? kids.flatMap((child) => renderRow(child, depth + 1)) : []),
     ];
