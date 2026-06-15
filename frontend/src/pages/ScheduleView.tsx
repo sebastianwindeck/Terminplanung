@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare, Pencil, Lock } from "lucide-react";
+import { ArrowLeft, Upload, Download, Plus, BarChart2, List, GitCompare, Pencil, Lock, Save, X } from "lucide-react";
 import { ViewMode } from "gantt-task-react";
 import { projectsApi, versionsApi, positionsApi, mspdiApi, downloadWithAuth } from "@/api/client";
 import GanttChart from "@/components/GanttChart";
@@ -13,6 +13,7 @@ import PositionEditModal from "@/components/PositionEditModal";
 import CompareDialog from "@/components/CompareDialog";
 import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
 import VorgangDetailModal from "@/components/VorgangDetailModal";
+import VersionShiftFields from "@/components/VersionShiftFields";
 import Modal from "@/components/Modal";
 import { SHIFT_REASONS } from "@/types";
 import type { SchedulePosition } from "@/types";
@@ -32,6 +33,9 @@ const GANTT_MODE_MAP: Record<GanttView, ViewMode> = {
   Month: ViewMode.Month,
 };
 
+type DraftChange = { start_date?: string; end_date?: string; duration_days?: number; progress?: number };
+type SaveAsForm = { name: string; description: string; is_baseline: boolean; shift_reason: string; shift_description: string };
+
 export default function ScheduleView() {
   const { projectId, versionId } = useParams<{ projectId: string; versionId: string }>();
   const vid = Number(versionId);
@@ -46,8 +50,13 @@ export default function ScheduleView() {
   const [showNewPosition, setShowNewPosition] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [showEditVersion, setShowEditVersion] = useState(false);
+  const [showSaveAs, setShowSaveAs] = useState(false);
   const [shiftForm, setShiftForm] = useState({ shift_reason: "", shift_description: "" });
   const [selectedPosition, setSelectedPosition] = useState<SchedulePosition | null>(null);
+  const [draftChanges, setDraftChanges] = useState<Record<number, DraftChange>>({});
+  const [saveAsForm, setSaveAsForm] = useState<SaveAsForm>({
+    name: "", description: "", is_baseline: false, shift_reason: "", shift_description: "",
+  });
 
   const qc = useQueryClient();
 
@@ -58,6 +67,16 @@ export default function ScheduleView() {
     queryKey: ["positions", vid],
     queryFn: () => positionsApi.listForVersion(vid),
   });
+
+  const displayPositions = useMemo<SchedulePosition[]>(() => {
+    return positions.map((p) => {
+      const ch = draftChanges[p.id];
+      return ch ? { ...p, ...ch } : p;
+    });
+  }, [positions, draftChanges]);
+
+  const draftCount = Object.keys(draftChanges).length;
+  const hasDraft = draftCount > 0;
 
   const updateVersionMutation = useMutation({
     mutationFn: (data: { shift_reason?: string; shift_description?: string }) =>
@@ -70,12 +89,49 @@ export default function ScheduleView() {
     onError: () => toast.error("Fehler beim Speichern"),
   });
 
+  const saveAsMutation = useMutation({
+    mutationFn: () =>
+      versionsApi.saveAs(vid, {
+        name: saveAsForm.name,
+        description: saveAsForm.description || undefined,
+        is_baseline: saveAsForm.is_baseline,
+        shift_reason: saveAsForm.shift_reason || undefined,
+        shift_description: saveAsForm.shift_description || undefined,
+        changes: Object.entries(draftChanges).map(([id, ch]) => ({ id: Number(id), ...ch })),
+      }),
+    onSuccess: (newVersion) => {
+      setDraftChanges({});
+      setShowSaveAs(false);
+      setSaveAsForm({ name: "", description: "", is_baseline: false, shift_reason: "", shift_description: "" });
+      qc.invalidateQueries({ queryKey: ["versions", pid] });
+      toast.success("Neue Version erstellt");
+      navigate(`/projects/${pid}/versions/${newVersion.id}`);
+    },
+    onError: () => toast.error("Fehler beim Speichern"),
+  });
+
   const openShiftEdit = () => {
-    setShiftForm({
-      shift_reason: version?.shift_reason ?? "",
-      shift_description: version?.shift_description ?? "",
-    });
+    setShiftForm({ shift_reason: version?.shift_reason ?? "", shift_description: version?.shift_description ?? "" });
     setShowEditVersion(true);
+  };
+
+  const handleGanttDateChange = (posId: number, startDate: string, endDate: string) => {
+    setDraftChanges((prev) => ({ ...prev, [posId]: { ...prev[posId], start_date: startDate, end_date: endDate } }));
+  };
+
+  const handleGanttProgressChange = (posId: number, progress: number) => {
+    setDraftChanges((prev) => ({ ...prev, [posId]: { ...prev[posId], progress } }));
+  };
+
+  const openSaveAs = () => {
+    setSaveAsForm({
+      name: `${version?.name ?? ""} – Angepasst`,
+      description: "",
+      is_baseline: false,
+      shift_reason: "",
+      shift_description: "",
+    });
+    setShowSaveAs(true);
   };
 
   const isBaseVersion = version?.version_number === 1;
@@ -128,13 +184,13 @@ export default function ScheduleView() {
             className="btn-secondary"
             onClick={() => downloadWithAuth(mspdiApi.exportUrl(vid), `Terminplan_V${version?.version_number}.xml`)}
           >
-            <Download className="w-4 h-4" /> MS Project exportieren
+            <Download className="w-4 h-4" /> MS Project
           </button>
           <button
             className="btn-secondary"
             onClick={() => downloadWithAuth(positionsApi.exportUrl(vid), `Terminplan_V${version?.version_number}.xlsx`)}
           >
-            <Download className="w-4 h-4" /> Excel exportieren
+            <Download className="w-4 h-4" /> Excel
           </button>
           {!isBaseVersion && (
             <button className="btn-secondary" onClick={() => setShowImport(true)}>
@@ -148,6 +204,26 @@ export default function ScheduleView() {
           )}
         </div>
       </div>
+
+      {/* Draft changes banner */}
+      {hasDraft && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <span className="text-sm text-amber-800 font-medium">
+            {draftCount} Position{draftCount !== 1 ? "en" : ""} geändert – nicht gespeichert
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-ghost text-sm text-amber-700 hover:text-amber-900"
+              onClick={() => setDraftChanges({})}
+            >
+              <X className="w-4 h-4" /> Verwerfen
+            </button>
+            <button className="btn-primary text-sm" onClick={openSaveAs}>
+              <Save className="w-4 h-4" /> Als neue Version speichern
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex items-center gap-1 border-b border-gray-200">
@@ -192,10 +268,26 @@ export default function ScheduleView() {
           Lade Positionen…
         </div>
       ) : tab === "table" ? (
-        <PositionTable positions={positions} versionId={vid} onRowClick={(pos) => setSelectedPosition(pos)} readOnly={isBaseVersion} />
+        <PositionTable
+          positions={displayPositions}
+          versionId={vid}
+          onRowClick={(pos) => setSelectedPosition(pos)}
+          readOnly={isBaseVersion}
+        />
       ) : (
         <div className="card p-4">
-          <GanttChart positions={positions} viewMode={GANTT_MODE_MAP[ganttView]} />
+          {!isBaseVersion && (
+            <p className="text-xs text-gray-400 mb-2">
+              Balken ziehen zum Anpassen der Termine · Änderungen über „Als neue Version speichern" sichern
+            </p>
+          )}
+          <GanttChart
+            positions={displayPositions}
+            viewMode={GANTT_MODE_MAP[ganttView]}
+            readOnly={isBaseVersion}
+            onDateChange={!isBaseVersion ? handleGanttDateChange : undefined}
+            onProgressChange={!isBaseVersion ? handleGanttProgressChange : undefined}
+          />
         </div>
       )}
 
@@ -231,40 +323,79 @@ export default function ScheduleView() {
         />
       )}
 
+      {/* Shift reason editor */}
       <Modal open={showEditVersion} onClose={() => setShowEditVersion(false)} title="Verschiebungsgrund bearbeiten">
         <form
-          onSubmit={(e) => { e.preventDefault(); updateVersionMutation.mutate({ shift_reason: shiftForm.shift_reason || undefined, shift_description: shiftForm.shift_description || undefined }); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            updateVersionMutation.mutate({
+              shift_reason: shiftForm.shift_reason || undefined,
+              shift_description: shiftForm.shift_description || undefined,
+            });
+          }}
           className="space-y-4"
         >
-          <div>
-            <label className="label">Grund der Verschiebung</label>
-            <select
-              className="input"
-              value={shiftForm.shift_reason}
-              onChange={(e) => setShiftForm((f) => ({ ...f, shift_reason: e.target.value }))}
-            >
-              <option value="">— Kein Grund angegeben —</option>
-              {SHIFT_REASONS.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-          {shiftForm.shift_reason && (
-            <div>
-              <label className="label">Beschreibung zum Grund</label>
-              <textarea
-                className="input"
-                rows={4}
-                placeholder="Detaillierte Beschreibung der Verschiebungsursache…"
-                value={shiftForm.shift_description}
-                onChange={(e) => setShiftForm((f) => ({ ...f, shift_description: e.target.value }))}
-              />
-            </div>
-          )}
+          <VersionShiftFields
+            shiftReason={shiftForm.shift_reason}
+            shiftDescription={shiftForm.shift_description}
+            onChange={(key, value) => setShiftForm((f) => ({ ...f, [key]: value }))}
+          />
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setShowEditVersion(false)}>Abbrechen</button>
             <button type="submit" className="btn-primary" disabled={updateVersionMutation.isPending}>
               {updateVersionMutation.isPending ? "Speichert…" : "Speichern"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Save as new version */}
+      <Modal open={showSaveAs} onClose={() => setShowSaveAs(false)} title="Als neue Version speichern">
+        <form
+          onSubmit={(e) => { e.preventDefault(); saveAsMutation.mutate(); }}
+          className="space-y-4"
+        >
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-800">
+            {draftCount} Änderung{draftCount !== 1 ? "en" : ""} aus dem Gantt-Diagramm werden in die neue Version übernommen.
+          </div>
+          <div>
+            <label className="label">Versionsname *</label>
+            <input
+              className="input"
+              required
+              value={saveAsForm.name}
+              onChange={(e) => setSaveAsForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="z.B. Aktueller Stand KW 24"
+            />
+          </div>
+          <div>
+            <label className="label">Beschreibung</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={saveAsForm.description}
+              onChange={(e) => setSaveAsForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </div>
+          <VersionShiftFields
+            shiftReason={saveAsForm.shift_reason}
+            shiftDescription={saveAsForm.shift_description}
+            onChange={(key, value) => setSaveAsForm((f) => ({ ...f, [key]: value }))}
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="save_as_baseline"
+              checked={saveAsForm.is_baseline}
+              onChange={(e) => setSaveAsForm((f) => ({ ...f, is_baseline: e.target.checked }))}
+              className="w-4 h-4 accent-primary-600"
+            />
+            <label htmlFor="save_as_baseline" className="text-sm font-medium text-gray-700">Als Baseline markieren</label>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" className="btn-secondary" onClick={() => setShowSaveAs(false)}>Abbrechen</button>
+            <button type="submit" className="btn-primary" disabled={saveAsMutation.isPending}>
+              {saveAsMutation.isPending ? "Speichert…" : "Neue Version erstellen"}
             </button>
           </div>
         </form>

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Upload, Trash2, Building2 } from "lucide-react";
-import { companySettingsApi } from "@/api/client";
+import { Upload, Trash2, Building2, FileSpreadsheet, Download } from "lucide-react";
+import { companySettingsApi, downloadWithAuth } from "@/api/client";
 import type { CompanySettings } from "@/types";
 
 const FONT_OPTIONS = ["Helvetica", "Arial", "Times New Roman", "Georgia"];
@@ -38,6 +38,7 @@ function buildForm(settings: CompanySettings): FormState {
 export default function CompanySettingsPage() {
   const qc = useQueryClient();
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const templateInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<FormState | null>(null);
 
   const { data: settings, isLoading } = useQuery({
@@ -79,6 +80,24 @@ export default function CompanySettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["company-settings"] });
       toast.success("Logo gelöscht");
+    },
+    onError: () => toast.error("Fehler beim Löschen"),
+  });
+
+  const templateUploadMutation = useMutation({
+    mutationFn: (file: File) => companySettingsApi.uploadTemplate(file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-settings"] });
+      toast.success("Vorlage hochgeladen");
+    },
+    onError: () => toast.error("Fehler beim Hochladen"),
+  });
+
+  const templateDeleteMutation = useMutation({
+    mutationFn: () => companySettingsApi.deleteTemplate(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-settings"] });
+      toast.success("Vorlage gelöscht");
     },
     onError: () => toast.error("Fehler beim Löschen"),
   });
@@ -229,6 +248,72 @@ export default function CompanySettingsPage() {
               {logoUploadMutation.isPending ? "Hochlädt…" : settings?.has_logo ? "Logo ersetzen" : "Logo hochladen"}
             </button>
             <p className="text-xs text-gray-400 mt-1">PNG, JPG, SVG · max. 10 MB</p>
+          </div>
+        </div>
+
+        {/* Excel-Vorlage */}
+        <div className="card p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Excel-Vorlage</h2>
+          <p className="text-sm text-gray-500">
+            Laden Sie eine eigene Excel-Vorlage hoch, die Mitarbeiter zum Erstellen der Basisversion verwenden können.
+            Wenn keine Vorlage hochgeladen ist, wird die Systemvorlage verwendet.
+          </p>
+
+          {settings?.has_template && (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-gray-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+                <FileSpreadsheet className="w-4 h-4 text-green-600 flex-shrink-0" />
+                <span className="truncate max-w-xs">{settings.template_filename ?? "Vorlage"}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                onClick={() => downloadWithAuth(companySettingsApi.templateUrl(), settings.template_filename ?? "Vorlage.xlsx")}
+              >
+                <Download className="w-4 h-4" /> Herunterladen
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-red-500 hover:text-red-600 text-sm"
+                onClick={() => {
+                  if (window.confirm("Vorlage löschen? Danach wird wieder die Systemvorlage verwendet.")) {
+                    templateDeleteMutation.mutate();
+                  }
+                }}
+                disabled={templateDeleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4" /> Vorlage entfernen
+              </button>
+            </div>
+          )}
+
+          <div>
+            <input
+              ref={templateInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                if (f.size > 20 * 1024 * 1024) {
+                  toast.error("Datei zu groß – max. 20 MB erlaubt");
+                  e.target.value = "";
+                  return;
+                }
+                templateUploadMutation.mutate(f);
+              }}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => templateInputRef.current?.click()}
+              disabled={templateUploadMutation.isPending}
+            >
+              <Upload className="w-4 h-4" />
+              {templateUploadMutation.isPending ? "Hochlädt…" : settings?.has_template ? "Vorlage ersetzen" : "Vorlage hochladen"}
+            </button>
+            <p className="text-xs text-gray-400 mt-1">Excel (.xlsx, .xls) · max. 20 MB</p>
           </div>
         </div>
 

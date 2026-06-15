@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #1a1a1a; }
+
+  /* Letterhead */
+  .letterhead {
+    background: #1e3a5f;
+    padding: 18pt 25pt 14pt 25pt;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-height: 60pt;
+  }
+  .letterhead-company { color: #fff; }
+  .letterhead-company .name { font-size: 14pt; font-weight: bold; margin-bottom: 4pt; }
+  .letterhead-company .details { font-size: 8pt; color: #b8cde0; line-height: 1.5; }
+  .letterhead-logo { max-height: 48pt; max-width: 130pt; }
+
+  /* Body area */
+  .body-area { padding: 22pt 25pt 20pt 25pt; }
+
+  /* Recipient / sender strip */
+  .address-block { margin-bottom: 20pt; }
+  .sender-mini { font-size: 7pt; color: #555; border-bottom: 0.5pt solid #bbb; margin-bottom: 4pt; padding-bottom: 2pt; }
+  .recipient { font-size: 10pt; line-height: 1.6; min-height: 60pt; }
+
+  /* Date block */
+  .date-block { text-align: right; font-size: 9pt; margin-bottom: 16pt; color: #333; }
+
+  /* Subject */
+  .subject { font-size: 11pt; font-weight: bold; margin-bottom: 4pt; }
+  .subject-ref { font-size: 9pt; color: #444; margin-bottom: 18pt; }
+  .subject-ref span { margin-right: 20pt; }
+
+  /* Salutation */
+  .salutation { margin-bottom: 12pt; font-size: 10pt; }
+
+  /* Body text */
+  .letter-body { font-size: 10pt; line-height: 1.6; white-space: pre-wrap; margin-bottom: 14pt; }
+
+  /* Info table */
+  .info-table { width: 100%; border-collapse: collapse; margin: 12pt 0 16pt 0; font-size: 9pt; }
+  .info-table th { background: #1e3a5f; color: #fff; padding: 4pt 8pt; text-align: left; font-weight: bold; }
+  .info-table td { padding: 3pt 8pt; border-bottom: 0.5pt solid #ddd; vertical-align: top; }
+  .info-table tr:nth-child(even) td { background: #f5f7fa; }
+  .info-table .label-cell { font-weight: bold; width: 38%; color: #333; }
+
+  /* Legal note */
+  .legal-note {
+    background: #f0f4f8;
+    border-left: 3pt solid #1e3a5f;
+    padding: 8pt 10pt;
+    font-size: 8.5pt;
+    color: #444;
+    margin: 14pt 0;
+    line-height: 1.5;
+  }
+
+  /* Closing */
+  .closing { margin-top: 18pt; font-size: 10pt; }
+  .signature-block { margin-top: 32pt; font-size: 9pt; color: #333; line-height: 1.5; }
+  .signature-line { border-bottom: 0.5pt solid #666; width: 200pt; margin-bottom: 4pt; }
+
+  /* Attachments */
+  .attachments { margin-top: 20pt; font-size: 9pt; color: #444; }
+  .attachments-label { font-weight: bold; margin-bottom: 3pt; }
+
+  /* Footer */
+  .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 6pt 25pt; background: #f5f7fa; border-top: 0.5pt solid #ccc; }
+  .footer-inner { display: flex; justify-content: space-between; font-size: 7pt; color: #888; }
+
+  .divider { border: none; border-top: 0.5pt solid #ddd; margin: 10pt 0; }
+</style>
+</head>
+<body>
+
+<!-- Footer (fixed) -->
+<div class="footer">
+  <div class="footer-inner">
+    <span>{{ company.company_name }} · Behinderungsanzeige gemäß § 6 Abs. 1 VOB/B</span>
+    <span>Erstellt: {{ briefdatum }} · Seite <pdf:pagenumber> von <pdf:pagecount></span>
+  </div>
+</div>
+
+<!-- Letterhead -->
+<div class="letterhead">
+  <div class="letterhead-company">
+    <div class="name">{{ company.company_name }}</div>
+    <div class="details">
+      {% if company.address %}{{ company.address }}<br>{% endif %}
+      {% if company.phone %}Tel.: {{ company.phone }}{% if company.email %} · {% endif %}{% endif %}
+      {% if company.email %}{{ company.email }}{% endif %}
+      {% if company.website %}<br>{{ company.website }}{% endif %}
+    </div>
+  </div>
+  {% if logo_b64 %}
+  <img src="data:image/png;base64,{{ logo_b64 }}" class="letterhead-logo" alt="Logo" />
+  {% endif %}
+</div>
+
+<!-- Body -->
+<div class="body-area">
+
+  <!-- Address block (DIN 5008) -->
+  <div class="address-block">
+    <div class="sender-mini">
+      {{ company.company_name }}{% if company.address %} · {{ company.address }}{% endif %}
+    </div>
+    <div class="recipient">
+      {% if anzeige.adressat %}
+        {{ anzeige.adressat | replace('\n', '<br>') | safe }}
+      {% else %}
+        [Empfänger]
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Date -->
+  <div class="date-block">{{ ort_datum }}</div>
+
+  <!-- Subject -->
+  <div class="subject">Behinderungsanzeige gemäß § 6 Abs. 1 VOB/B</div>
+  <div class="subject-ref">
+    <span><strong>Bauvorhaben:</strong> {{ project.name }}{% if project.project_number %} ({{ project.project_number }}){% endif %}</span>
+    {% if project.contract_number %}<span><strong>Vertrag:</strong> {{ project.contract_number }}</span>{% endif %}
+    {% if project.trade %}<span><strong>Gewerk:</strong> {{ project.trade }}</span>{% endif %}
+    {% if stoerung.stoerung_number %}<span><strong>Störungs-Nr.:</strong> {{ stoerung.stoerung_number }}</span>{% endif %}
+  </div>
+
+  <!-- Salutation -->
+  <div class="salutation">Sehr geehrte Damen und Herren,</div>
+
+  <!-- Structured info table -->
+  <table class="info-table">
+    <thead>
+      <tr><th colspan="2">Details zur Behinderung</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="label-cell">Art der Behinderung</td>
+        <td>{{ stoerung.stoerungsart or '–' }}{% if stoerung.unterkategorie %} / {{ stoerung.unterkategorie }}{% endif %}</td>
+      </tr>
+      <tr>
+        <td class="label-cell">Behinderungsbeginn</td>
+        <td>{{ stoerung.stoerungsbeginn.strftime('%d.%m.%Y') if stoerung.stoerungsbeginn else '–' }}</td>
+      </tr>
+      {% if stoerung.stoerungsende %}
+      <tr>
+        <td class="label-cell">Voraussichtl. Ende</td>
+        <td>{{ stoerung.stoerungsende.strftime('%d.%m.%Y') }}</td>
+      </tr>
+      {% endif %}
+      {% if vorgang %}
+      <tr>
+        <td class="label-cell">Betroffener Vorgang</td>
+        <td>{% if vorgang.pos_number %}Pos. {{ vorgang.pos_number }}: {% endif %}{{ vorgang.title }}</td>
+      </tr>
+      {% if vorgang.start_date or vorgang.end_date %}
+      <tr>
+        <td class="label-cell">Geplante Ausführung</td>
+        <td>
+          {% if vorgang.start_date %}{{ vorgang.start_date.strftime('%d.%m.%Y') }}{% endif %}
+          {% if vorgang.start_date and vorgang.end_date %} – {% endif %}
+          {% if vorgang.end_date %}{{ vorgang.end_date.strftime('%d.%m.%Y') }}{% endif %}
+          {% if vorgang.duration_days %} ({{ vorgang.duration_days }} Arbeitstage){% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endif %}
+      {% if stoerung.verursacher %}
+      <tr>
+        <td class="label-cell">Verursacher</td>
+        <td>{{ stoerung.verursacher }}</td>
+      </tr>
+      {% endif %}
+      {% if stoerung.verantwortungsbereich %}
+      <tr>
+        <td class="label-cell">Verantwortungsbereich</td>
+        <td>{{ stoerung.verantwortungsbereich }}</td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td class="label-cell">Anzeigentyp</td>
+        <td>{{ typ_label }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Main letter body -->
+  {% if stoerung.hindernde_wirkung %}
+  <p style="margin-bottom:10pt; font-size:10pt; line-height:1.6;"><strong>Hindernde Wirkung:</strong></p>
+  <div class="letter-body">{{ stoerung.hindernde_wirkung }}</div>
+  {% endif %}
+
+  {% if stoerung.beschreibung %}
+  <p style="margin-bottom:6pt; font-size:10pt; line-height:1.6;"><strong>Beschreibung der Behinderung:</strong></p>
+  <div class="letter-body">{{ stoerung.beschreibung }}</div>
+  {% endif %}
+
+  {% if anzeige.text %}
+  <div class="letter-body" style="margin-top:10pt;">{{ anzeige.text }}</div>
+  {% endif %}
+
+  {% if stoerung.erforderliche_mitwirkung_ag %}
+  <p style="margin-bottom:6pt; font-size:10pt;"><strong>Erforderliche Mitwirkung Auftraggeber:</strong></p>
+  <div class="letter-body">{{ stoerung.erforderliche_mitwirkung_ag }}</div>
+  {% endif %}
+
+  <!-- Legal note -->
+  <div class="legal-note">
+    Wir machen hiermit ausdrücklich von unserem Recht auf Anmeldung der Behinderung gemäß
+    § 6 Abs. 1 VOB/B Gebrauch und behalten uns vor, die durch diese Behinderung entstehenden
+    Bauzeitverlängerungen sowie Mehrkosten gemäß § 6 Abs. 6 VOB/B geltend zu machen.
+    Wir fordern Sie auf, die Ursache der Behinderung unverzüglich zu beseitigen.
+  </div>
+
+  <!-- Closing -->
+  <div class="closing">Mit freundlichen Grüßen,</div>
+
+  <div class="signature-block">
+    <br>
+    <div class="signature-line"></div>
+    {% if project.site_manager %}{{ project.site_manager }}<br>{% endif %}
+    {% if project.construction_lead %}{{ project.construction_lead }}<br>{% endif %}
+    {{ company.company_name }}
+    {% if anzeige.versandart %}
+    <br><br><em style="font-size:8pt; color:#777;">Versandart: {{ anzeige.versandart }}</em>
+    {% endif %}
+  </div>
+
+  {% if anzeige.cc %}
+  <div style="margin-top:12pt; font-size:8.5pt; color:#555;">
+    <strong>CC:</strong> {{ anzeige.cc }}
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>

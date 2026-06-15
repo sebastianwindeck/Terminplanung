@@ -273,7 +273,31 @@ class CompanySettingsResponse(CompanySettingsBase):
     logo_filename: Optional[str] = None
     logo_mime_type: Optional[str] = None
     has_logo: bool = False
+    template_filename: Optional[str] = None
+    has_template: bool = False
     updated_at: datetime
+
+
+# ── Version Save-As ──────────────────────────────────────────────────────────
+
+class PositionChange(BaseModel):
+    id: int
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    duration_days: Optional[int] = None
+    progress: Optional[float] = None
+    title: Optional[str] = None
+    responsible: Optional[str] = None
+    status: Optional[str] = None
+
+
+class SaveAsVersionRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_baseline: bool = False
+    shift_reason: Optional[str] = None
+    shift_description: Optional[str] = None
+    changes: list[PositionChange] = []
 
 
 # ── MS Project Import ─────────────────────────────────────────────────────────

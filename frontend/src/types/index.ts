@@ -227,6 +227,8 @@ export interface CompanySettings {
   logo_filename: string | null;
   logo_mime_type: string | null;
   has_logo: boolean;
+  template_filename: string | null;
+  has_template: boolean;
   header_text: string | null;
   footer_text: string | null;
   primary_color: string;

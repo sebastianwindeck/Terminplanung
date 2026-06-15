@@ -1,12 +1,15 @@
 import { useMemo } from "react";
 import { Gantt, Task, ViewMode } from "gantt-task-react";
 import "gantt-task-react/dist/index.css";
+import { format, addDays } from "date-fns";
 import type { SchedulePosition } from "@/types";
-import { addDays } from "date-fns";
 
 interface Props {
   positions: SchedulePosition[];
   viewMode?: ViewMode;
+  onDateChange?: (positionId: number, startDate: string, endDate: string) => void;
+  onProgressChange?: (positionId: number, progress: number) => void;
+  readOnly?: boolean;
 }
 
 const STATUS_GANTT_COLORS: Record<string, string> = {
@@ -17,7 +20,7 @@ const STATUS_GANTT_COLORS: Record<string, string> = {
   cancelled: "#9ca3af",
 };
 
-export default function GanttChart({ positions, viewMode = ViewMode.Week }: Props) {
+export default function GanttChart({ positions, viewMode = ViewMode.Week, onDateChange, onProgressChange, readOnly = false }: Props) {
   const tasks: Task[] = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -50,10 +53,10 @@ export default function GanttChart({ positions, viewMode = ViewMode.Week }: Prop
             progressColor: `${color}cc`,
             progressSelectedColor: `${color}aa`,
           },
-          isDisabled: false,
+          isDisabled: readOnly,
         } as Task;
       });
-  }, [positions]);
+  }, [positions, readOnly]);
 
   if (tasks.length === 0) {
     return (
@@ -73,6 +76,24 @@ export default function GanttChart({ positions, viewMode = ViewMode.Week }: Prop
         locale="de-DE"
         barFill={80}
         todayColor="rgba(59,130,246,0.1)"
+        onDateChange={
+          onDateChange && !readOnly
+            ? (task) => {
+                onDateChange(
+                  Number(task.id),
+                  format(task.start, "yyyy-MM-dd"),
+                  format(task.end, "yyyy-MM-dd")
+                );
+              }
+            : undefined
+        }
+        onProgressChange={
+          onProgressChange && !readOnly
+            ? (task) => {
+                onProgressChange(Number(task.id), task.progress / 100);
+              }
+            : undefined
+        }
       />
     </div>
   );

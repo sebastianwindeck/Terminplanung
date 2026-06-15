@@ -49,6 +49,7 @@ export const behinderungsanzeigeApi = {
   versenden: (id: number) =>
     v1.post<Behinderungsanzeige>(`/behinderungsanzeigen/${id}/versenden`).then((r) => r.data),
   delete: (id: number) => v1.delete(`/behinderungsanzeigen/${id}`),
+  pdfUrl: (id: number) => `/api/v1/behinderungsanzeigen/${id}/pdf`,
 };
 
 // ── Kausalitäten ──────────────────────────────────────────────────────────────

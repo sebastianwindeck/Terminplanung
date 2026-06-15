@@ -82,6 +82,17 @@ export const versionsApi = {
   delete: (id: number) => api.delete(`/versions/${id}`),
   compare: (versionAId: number, versionBId: number) =>
     api.get<VersionComparison>(`/versions/${versionAId}/compare/${versionBId}`).then((r) => r.data),
+  saveAs: (
+    versionId: number,
+    data: {
+      name: string;
+      description?: string;
+      is_baseline?: boolean;
+      shift_reason?: string;
+      shift_description?: string;
+      changes: { id: number; start_date?: string; end_date?: string; duration_days?: number; progress?: number; title?: string; responsible?: string; status?: string }[];
+    }
+  ) => api.post<ScheduleVersion>(`/versions/${versionId}/save-as`, data).then((r) => r.data),
 };
 
 // ── Positions ─────────────────────────────────────────────────────────────────
@@ -230,4 +241,11 @@ export const companySettingsApi = {
   },
   deleteLogo: () => api.delete("/company-settings/logo").then((r) => r.data),
   logoUrl: () => "/api/company-settings/logo",
+  uploadTemplate: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post<CompanySettings>("/company-settings/template", fd).then((r) => r.data);
+  },
+  deleteTemplate: () => api.delete("/company-settings/template").then((r) => r.data),
+  templateUrl: () => "/api/company-settings/template",
 };

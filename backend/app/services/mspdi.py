@@ -1,8 +1,8 @@
 import re
-import warnings
 from datetime import datetime, date
 from typing import Optional
 import xml.etree.ElementTree as ET
+from dateutil import parser as dateutil_parser
 
 NS = "http://schemas.microsoft.com/project"
 NS_PREFIX = f"{{{NS}}}"
@@ -26,12 +26,24 @@ def _parse_iso_duration_to_days(duration_str: str) -> Optional[int]:
 
 
 def _parse_date(date_str: Optional[str]) -> Optional[date]:
-    if not date_str:
+    """Parse a date string from MSPDI XML.
+
+    Handles:
+    - ISO 8601 strings like "2025-09-01T08:00:00" and "2025-09-01T08:00:00+02:00"
+    - "NA" placeholder used by MS Project for unscheduled manually-planned tasks
+    - Any other format dateutil can recognise
+    """
+    if not date_str or date_str.strip().upper() == "NA":
         return None
     try:
-        return datetime.fromisoformat(date_str.replace("Z", "+00:00")).date()
-    except (ValueError, AttributeError):
+        return dateutil_parser.parse(date_str).date()
+    except (ValueError, AttributeError, OverflowError):
         return None
+
+
+def _text(element: Optional[ET.Element]) -> Optional[str]:
+    """Return the text of an Element, or None if element is None or has no text."""
+    return element.text if element is not None else None
 
 
 def _outline_parent(outline_number: str) -> Optional[str]:
@@ -86,15 +98,29 @@ def parse_mspdi(xml_bytes: bytes) -> tuple[list[dict], list[str]]:
             except ValueError:
                 pass
 
-        duration_el = task_el.find(_tag("Duration"))
-        duration_days = _parse_iso_duration_to_days(duration_el.text if duration_el is not None else "")
+        # Duration: prefer Duration, fall back to ManualDuration (manually-planned tasks)
+        duration_str = (
+            _text(task_el.find(_tag("Duration")))
+            or _text(task_el.find(_tag("ManualDuration")))
+            or ""
+        )
+        duration_days = _parse_iso_duration_to_days(duration_str)
+
+        # Start/Finish: MS Project uses "NA" for manually-planned tasks.
+        # Fall back to ManualStart / ManualFinish in that case.
+        start_date = _parse_date(_text(task_el.find(_tag("Start")))) or _parse_date(
+            _text(task_el.find(_tag("ManualStart")))
+        )
+        end_date = _parse_date(_text(task_el.find(_tag("Finish")))) or _parse_date(
+            _text(task_el.find(_tag("ManualFinish")))
+        )
 
         raw_tasks.append({
             "pos_number": pos_number,
             "outline_number": outline_number,
             "title": name_el.text,
-            "start_date": _parse_date((task_el.find(_tag("Start")) or ET.Element("x")).text),
-            "end_date": _parse_date((task_el.find(_tag("Finish")) or ET.Element("x")).text),
+            "start_date": start_date,
+            "end_date": end_date,
             "duration_days": duration_days,
             "is_milestone": is_milestone,
             "progress": progress,

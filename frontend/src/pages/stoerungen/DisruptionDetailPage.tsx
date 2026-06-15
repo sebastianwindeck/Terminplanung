@@ -233,10 +233,18 @@ export default function DisruptionDetailPage() {
                   <span className="text-sm font-medium capitalize">{a.typ}</span>
                   <span className="ml-2 text-xs text-gray-500">{a.adressat}</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${a.status === "versendet" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                     {a.status}
                   </span>
+                  <a
+                    href={behinderungsanzeigeApi.pdfUrl(a.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs px-2 py-0.5 bg-gray-600 text-white rounded hover:bg-gray-700"
+                  >
+                    📄 Schreiben (PDF)
+                  </a>
                   {a.status === "entwurf" && (
                     <button
                       onClick={() => versendeMutation.mutate(a.id)}

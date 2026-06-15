@@ -255,8 +255,23 @@ def export_positions(version_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/template")
-def download_template():
+def download_template(db: Session = Depends(get_db)):
     from fastapi.responses import StreamingResponse
+    from ..services import storage as _storage
+
+    # Return company-specific template if one has been uploaded
+    settings = db.query(models.CompanySettings).filter(models.CompanySettings.id == 1).first()
+    if settings and settings.template_stored_path:
+        try:
+            file_bytes = _storage.read_file(settings.template_stored_path)
+            return StreamingResponse(
+                io.BytesIO(file_bytes),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{settings.template_filename or "Terminplan-Vorlage.xlsx"}"'},
+            )
+        except Exception:
+            pass  # fall through to default template
+
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
 

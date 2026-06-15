@@ -127,6 +127,70 @@ def delete_version(version_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
+@router.post("/{version_id}/save-as", response_model=schemas.VersionResponse, status_code=status.HTTP_201_CREATED)
+def save_as_version(version_id: int, data: schemas.SaveAsVersionRequest, db: Session = Depends(get_db)):
+    source = db.query(models.ScheduleVersion).filter(models.ScheduleVersion.id == version_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Version nicht gefunden")
+
+    changes_map = {c.id: c for c in data.changes}
+
+    max_ver = (
+        db.query(func.max(models.ScheduleVersion.version_number))
+        .filter(models.ScheduleVersion.project_id == source.project_id)
+        .scalar()
+        or 0
+    )
+
+    version = models.ScheduleVersion(
+        project_id=source.project_id,
+        name=data.name,
+        description=data.description,
+        is_baseline=data.is_baseline,
+        shift_reason=data.shift_reason,
+        shift_description=data.shift_description,
+        version_number=max_ver + 1,
+    )
+    db.add(version)
+    db.flush()
+
+    id_map: dict[int, int] = {}
+    sorted_positions = sorted(source.positions, key=lambda p: (p.sort_order, p.id))
+
+    for pos in sorted_positions:
+        ch = changes_map.get(pos.id)
+        new_pos = models.SchedulePosition(
+            version_id=version.id,
+            pos_number=pos.pos_number,
+            title=(ch.title if ch and ch.title is not None else pos.title),
+            description=pos.description,
+            start_date=(ch.start_date if ch and ch.start_date is not None else pos.start_date),
+            end_date=(ch.end_date if ch and ch.end_date is not None else pos.end_date),
+            duration_days=(ch.duration_days if ch and ch.duration_days is not None else pos.duration_days),
+            responsible=(ch.responsible if ch and ch.responsible is not None else pos.responsible),
+            trade=pos.trade,
+            typ=pos.typ,
+            status=(ch.status if ch and ch.status is not None else pos.status),
+            progress=(ch.progress if ch and ch.progress is not None else pos.progress),
+            sort_order=pos.sort_order,
+            is_milestone=pos.is_milestone,
+            color=pos.color,
+        )
+        db.add(new_pos)
+        db.flush()
+        id_map[pos.id] = new_pos.id
+
+    for pos in sorted_positions:
+        if pos.parent_id and pos.parent_id in id_map:
+            db.query(models.SchedulePosition).filter(
+                models.SchedulePosition.id == id_map[pos.id]
+            ).update({"parent_id": id_map[pos.parent_id]})
+
+    db.commit()
+    db.refresh(version)
+    return _version_response(version, db)
+
+
 @router.get("/{version_a_id}/compare/{version_b_id}", response_model=schemas.VersionComparison)
 def compare_versions(version_a_id: int, version_b_id: int, db: Session = Depends(get_db)):
     va = db.query(models.ScheduleVersion).filter(models.ScheduleVersion.id == version_a_id).first()

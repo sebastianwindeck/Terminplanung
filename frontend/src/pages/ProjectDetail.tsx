@@ -14,44 +14,13 @@ import DailyReportListPage from "@/pages/bautagesberichte/DailyReportListPage";
 import ProjectMasterDataPage from "@/pages/ProjectMasterDataPage";
 import MSPDIImportDialog from "@/components/mspdi/MSPDIImportDialog";
 import ExcelImportAsVersionDialog from "@/components/ExcelImportAsVersionDialog";
+import VersionShiftFields from "@/components/VersionShiftFields";
 import type { ScheduleVersion, MSPDIImportResult } from "@/types";
 import { SHIFT_REASONS } from "@/types";
 
 type ProjectTab = "versions" | "emails" | "compare" | "bautagesberichte" | "stammdaten";
 
 type FormState = { name: string; description: string; is_baseline: boolean; shift_reason: string; shift_description: string };
-
-function VersionShiftFields({ form, setForm }: { form: FormState; setForm: React.Dispatch<React.SetStateAction<FormState>> }) {
-  return (
-    <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-3">
-      <div>
-        <label className="label">Grund der Verschiebung</label>
-        <select
-          className="input"
-          value={form.shift_reason}
-          onChange={(e) => setForm((f) => ({ ...f, shift_reason: e.target.value }))}
-        >
-          <option value="">— Kein Grund angegeben —</option>
-          {SHIFT_REASONS.map((r) => (
-            <option key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-      </div>
-      {form.shift_reason && (
-        <div>
-          <label className="label">Beschreibung zum Grund</label>
-          <textarea
-            className="input"
-            rows={3}
-            placeholder="Detaillierte Beschreibung der Verschiebungsursache…"
-            value={form.shift_description}
-            onChange={(e) => setForm((f) => ({ ...f, shift_description: e.target.value }))}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -329,7 +298,11 @@ export default function ProjectDetail() {
               ))}
             </select>
           </div>
-          <VersionShiftFields form={form} setForm={setForm} />
+          <VersionShiftFields
+            shiftReason={form.shift_reason}
+            shiftDescription={form.shift_description}
+            onChange={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
+          />
           <div className="flex items-center gap-2">
             <input type="checkbox" id="is_baseline" checked={form.is_baseline} onChange={(e) => setForm((f) => ({ ...f, is_baseline: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
             <label htmlFor="is_baseline" className="text-sm font-medium text-gray-700">Als Baseline markieren</label>
@@ -368,7 +341,11 @@ export default function ProjectDetail() {
             <label className="label">Beschreibung</label>
             <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </div>
-          <VersionShiftFields form={form} setForm={setForm} />
+          <VersionShiftFields
+            shiftReason={form.shift_reason}
+            shiftDescription={form.shift_description}
+            onChange={(key, value) => setForm((f) => ({ ...f, [key]: value }))}
+          />
           <div className="flex items-center gap-2">
             <input type="checkbox" id="edit_baseline" checked={form.is_baseline} onChange={(e) => setForm((f) => ({ ...f, is_baseline: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
             <label htmlFor="edit_baseline" className="text-sm font-medium text-gray-700">Als Baseline markieren</label>

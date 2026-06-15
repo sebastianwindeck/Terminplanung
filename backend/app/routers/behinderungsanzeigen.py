@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.services.auth_service import require_authenticated
-from app.models import Behinderungsanzeige, Stoerung
+from app.models import Behinderungsanzeige, CompanySettings, Stoerung
 from app.schemas_stoerung import (
     BehinderungsanzeigeCreate,
     BehinderungsanzeigeResponse,
     BehinderungsanzeigeUpdate,
 )
 from app.services.stoerung_immutable import assert_anzeige_not_locked
+from app.services.pdf_behinderungsanzeige import render_behinderungsanzeige_pdf
 
 router = APIRouter(prefix="/behinderungsanzeigen", tags=["behinderungsanzeigen"], dependencies=[Depends(require_authenticated)])
 
@@ -77,3 +79,31 @@ def delete_anzeige(anzeige_id: int, db: Session = Depends(get_db)) -> None:
     assert_anzeige_not_locked(obj)
     db.delete(obj)
     db.commit()
+
+
+@router.get("/{anzeige_id}/pdf")
+def download_anzeige_pdf(anzeige_id: int, db: Session = Depends(get_db)) -> Response:
+    obj = (
+        db.query(Behinderungsanzeige)
+        .options(
+            selectinload(Behinderungsanzeige.stoerung)
+            .selectinload(Stoerung.project),
+            selectinload(Behinderungsanzeige.stoerung)
+            .selectinload(Stoerung.betroffener_vorgang),
+        )
+        .filter(Behinderungsanzeige.id == anzeige_id)
+        .first()
+    )
+    if not obj:
+        raise HTTPException(status_code=404, detail="Behinderungsanzeige nicht gefunden")
+
+    settings = db.query(CompanySettings).filter(CompanySettings.id == 1).first()
+    pdf_bytes = render_behinderungsanzeige_pdf(obj, settings)
+
+    stoerung_nr = obj.stoerung.stoerung_number if obj.stoerung else "unbekannt"
+    filename = f"Behinderungsanzeige_{stoerung_nr}_{obj.typ}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
