@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { stoerungsApi, behinderungsanzeigeApi, kausalitaetApi, stoerungsanlageApi } from "@/api/stoerungen";
+import { aiApi } from "@/api/client";
 import CausalityMatrix from "@/components/stoerungen/CausalityMatrix";
 import AuditLogTimeline from "@/components/stoerungen/AuditLogTimeline";
 import { DisruptionStatusBadge } from "@/components/stoerungen/DisruptionStatusBadge";
 import { EvidenceTrafficLight } from "@/components/stoerungen/EvidenceTrafficLight";
-import { aiApi } from "@/api/client";
 import type { StoerungStatus } from "@/types/stoerung";
 
 type Tab = "uebersicht" | "anzeigen" | "anlagen" | "kausalitaet" | "protokoll";
@@ -28,6 +29,22 @@ const STATUS_LABELS: Record<string, string> = {
   in_anspruchspruefung: "Anspruchsprüfung", abgeschlossen: "Abgeschlossen", verworfen: "Verworfen",
 };
 
+const DOKUMENT_TYPEN = [
+  { value: "maengelanzeige",   label: "Mängelanzeige",           par: "§ 13 VOB/B" },
+  { value: "bedenkenanmeldung", label: "Bedenkenanmeldung",      par: "§ 4 Abs. 3 VOB/B" },
+  { value: "nachtragsforderung", label: "Nachtragsforderung",    par: "§ 2 Nr. 5/6 VOB/B" },
+  { value: "abmahnung_verzug", label: "Abmahnung Leistungsverzug", par: "§ 5 Abs. 3/4 VOB/B" },
+];
+
+type AiPanelState = {
+  loading: boolean;
+  text: string | null;
+  label?: string;
+  par?: string;
+};
+
+const EMPTY_AI: AiPanelState = { loading: false, text: null };
+
 export default function DisruptionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const stoerungId = Number(id);
@@ -36,8 +53,27 @@ export default function DisruptionDetailPage() {
   const [tab, setTab] = useState<Tab>("uebersicht");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTyp, setUploadTyp] = useState("sonstiges");
-  const [aiText, setAiText] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+
+  // AI state per feature
+  const [aiVob, setAiVob] = useState<AiPanelState>(EMPTY_AI);
+  const [aiZusammenfassung, setAiZusammenfassung] = useState<AiPanelState>(EMPTY_AI);
+  const [aiBauzeit, setAiBauzeit] = useState<AiPanelState>(EMPTY_AI);
+  const [aiDokument, setAiDokument] = useState<AiPanelState>(EMPTY_AI);
+  const [dokTyp, setDokTyp] = useState("maengelanzeige");
+  type KausalitaetVorschlag = {
+    ereignis: string;
+    verantwortungsbereich: string;
+    geplante_leistung?: string;
+    tatsaechliche_leistung?: string;
+    unmittelbare_auswirkung_json?: string;
+    mittelbare_auswirkung?: string;
+    bewertung?: string;
+  };
+  const [aiKausalitaet, setAiKausalitaet] = useState<{
+    loading: boolean;
+    vorschlaege: KausalitaetVorschlag[];
+    hinweis: string;
+  }>({ loading: false, vorschlaege: [], hinweis: "" });
 
   const { data: stoerung, isLoading } = useQuery({
     queryKey: ["stoerung", stoerungId],
@@ -78,6 +114,15 @@ export default function DisruptionDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["behinderungsanzeigen", stoerungId] }),
   });
 
+  const createKausalitaetMutation = useMutation({
+    mutationFn: (data: Parameters<typeof kausalitaetApi.create>[0]) => kausalitaetApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kausalitaeten", stoerungId] });
+      toast.success("Kausalitätseintrag übernommen");
+    },
+    onError: () => toast.error("Fehler beim Übernehmen"),
+  });
+
   if (isLoading) return <div className="p-8 text-gray-500">Lade Störung…</div>;
   if (!stoerung) return <div className="p-8 text-red-600">Störung nicht gefunden.</div>;
 
@@ -93,6 +138,44 @@ export default function DisruptionDetailPage() {
       {label}
     </button>
   );
+
+  const AiPanel = ({ state, onCopy }: { state: AiPanelState; onCopy?: () => void }) => {
+    if (!state.text && !state.loading) return null;
+    return (
+      <div className="border border-violet-200 rounded-lg bg-violet-50 p-4 mt-3">
+        {state.label && (
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">
+              {state.label} {state.par && <span className="font-normal text-violet-500">({state.par})</span>}
+            </span>
+            {state.text && (
+              <button
+                onClick={() => { navigator.clipboard.writeText(state.text!); toast.success("Kopiert"); }}
+                className="text-xs text-violet-600 hover:text-violet-800"
+              >
+                In Zwischenablage
+              </button>
+            )}
+          </div>
+        )}
+        {!state.label && state.text && (
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">KI-generierter Text</span>
+            <button
+              onClick={() => { navigator.clipboard.writeText(state.text!); toast.success("Kopiert"); }}
+              className="text-xs text-violet-600 hover:text-violet-800"
+            >
+              In Zwischenablage
+            </button>
+          </div>
+        )}
+        {state.loading
+          ? <p className="text-sm text-violet-600 animate-pulse">KI generiert…</p>
+          : <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{state.text}</pre>
+        }
+      </div>
+    );
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -147,43 +230,86 @@ export default function DisruptionDetailPage() {
         <TabBtn t="protokoll" label="Protokoll" />
       </div>
 
+      {/* ── Übersicht ── */}
       {tab === "uebersicht" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            ["Störungsart", stoerung.stoerungsart],
-            ["Kritikalität", stoerung.kritikalitaet],
-            ["Verantwortung", stoerung.verantwortungsbereich],
-            ["Verursacher", stoerung.verursacher],
-            ["Betroffener Bereich", stoerung.betroffener_bereich],
-            ["Störungsbeginn", stoerung.stoerungsbeginn ? new Date(stoerung.stoerungsbeginn).toLocaleDateString("de-DE") : null],
-            ["Störungsende", stoerung.stoerungsende ? new Date(stoerung.stoerungsende).toLocaleDateString("de-DE") : "Andauernd"],
-          ].map(([label, value]) => (
-            <div key={label as string}>
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label as string}</dt>
-              <dd className="mt-0.5 text-sm text-gray-900">{(value as string) || "–"}</dd>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              ["Störungsart", stoerung.stoerungsart],
+              ["Kritikalität", stoerung.kritikalitaet],
+              ["Verantwortung", stoerung.verantwortungsbereich],
+              ["Verursacher", stoerung.verursacher],
+              ["Betroffener Bereich", stoerung.betroffener_bereich],
+              ["Störungsbeginn", stoerung.stoerungsbeginn ? new Date(stoerung.stoerungsbeginn).toLocaleDateString("de-DE") : null],
+              ["Störungsende", stoerung.stoerungsende ? new Date(stoerung.stoerungsende).toLocaleDateString("de-DE") : "Andauernd"],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label as string}</dt>
+                <dd className="mt-0.5 text-sm text-gray-900">{(value as string) || "–"}</dd>
+              </div>
+            ))}
+            {stoerung.beschreibung && (
+              <div className="md:col-span-2">
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Beschreibung</dt>
+                <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.beschreibung}</dd>
+              </div>
+            )}
+            {stoerung.hindernde_wirkung && (
+              <div className="md:col-span-2">
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Hindernde Wirkung</dt>
+                <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.hindernde_wirkung}</dd>
+              </div>
+            )}
+            {stoerung.sofortmassnahme && (
+              <div className="md:col-span-2">
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sofortmaßnahme</dt>
+                <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.sofortmassnahme}</dd>
+              </div>
+            )}
+          </div>
+
+          {/* KI-Zusammenfassung */}
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">KI-Zusammenfassung</span>
+              <button
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 disabled:opacity-50"
+                disabled={aiZusammenfassung.loading}
+                onClick={async () => {
+                  setAiZusammenfassung({ loading: true, text: null });
+                  try {
+                    const r = await aiApi.generateZusammenfassung(stoerungId);
+                    setAiZusammenfassung({ loading: false, text: r.text });
+                  } catch {
+                    setAiZusammenfassung({ loading: false, text: "Fehler beim Generieren." });
+                  }
+                }}
+              >
+                {aiZusammenfassung.loading ? "⏳ Generiert…" : "✨ Zusammenfassung generieren"}
+              </button>
             </div>
-          ))}
-          {stoerung.beschreibung && (
-            <div className="md:col-span-2">
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Beschreibung</dt>
-              <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.beschreibung}</dd>
-            </div>
-          )}
-          {stoerung.hindernde_wirkung && (
-            <div className="md:col-span-2">
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Hindernde Wirkung</dt>
-              <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.hindernde_wirkung}</dd>
-            </div>
-          )}
-          {stoerung.sofortmassnahme && (
-            <div className="md:col-span-2">
-              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">Sofortmaßnahme</dt>
-              <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{stoerung.sofortmassnahme}</dd>
-            </div>
-          )}
+            {aiZusammenfassung.loading && (
+              <p className="text-sm text-violet-600 animate-pulse py-2">KI generiert…</p>
+            )}
+            {aiZusammenfassung.text && !aiZusammenfassung.loading && (
+              <div className="border border-violet-200 rounded-lg bg-violet-50 p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">KI-generierte Zusammenfassung</span>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(aiZusammenfassung.text!); toast.success("Kopiert"); }}
+                    className="text-xs text-violet-600 hover:text-violet-800"
+                  >
+                    Kopieren
+                  </button>
+                </div>
+                <p className="text-sm text-gray-800 leading-relaxed">{aiZusammenfassung.text}</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
+      {/* ── Anzeigen ── */}
       {tab === "anzeigen" && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
@@ -193,39 +319,86 @@ export default function DisruptionDetailPage() {
             >
               + Neue Anzeige
             </Link>
-            <button
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-sm hover:bg-violet-700 disabled:opacity-50"
-              disabled={aiLoading}
-              onClick={async () => {
-                setAiLoading(true);
-                setAiText(null);
-                try {
-                  const res = await aiApi.generateVobText(stoerungId);
-                  setAiText(res.text);
-                } catch {
-                  setAiText("Fehler beim Generieren des Textes. Bitte ANTHROPIC_API_KEY prüfen.");
-                } finally {
-                  setAiLoading(false);
-                }
-              }}
-            >
-              {aiLoading ? "⏳ Generiert…" : "✨ KI VOB-Text generieren"}
-            </button>
           </div>
-          {aiText && (
-            <div className="border border-violet-200 rounded-lg bg-violet-50 p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">KI-generierter VOB/B-Text</span>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(aiText); }}
-                  className="text-xs text-violet-600 hover:text-violet-800"
+
+          {/* KI-Bereich Anzeigen */}
+          <div className="border border-violet-200 rounded-xl p-4 bg-violet-50 space-y-3">
+            <p className="text-xs font-semibold text-violet-800 uppercase tracking-wide">✨ KI-Assistenz</p>
+
+            {/* VOB-Text */}
+            <div>
+              <button
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 disabled:opacity-50"
+                disabled={aiVob.loading}
+                onClick={async () => {
+                  setAiVob({ loading: true, text: null, label: "Behinderungsanzeige", par: "§ 6 Abs. 1 VOB/B" });
+                  try {
+                    const r = await aiApi.generateVobText(stoerungId);
+                    setAiVob({ loading: false, text: r.text, label: "Behinderungsanzeige", par: "§ 6 Abs. 1 VOB/B" });
+                  } catch {
+                    setAiVob({ loading: false, text: "Fehler beim Generieren.", label: "Behinderungsanzeige", par: "§ 6 Abs. 1 VOB/B" });
+                  }
+                }}
+              >
+                {aiVob.loading ? "⏳ Generiert…" : "Behinderungsanzeige (§ 6 VOB/B)"}
+              </button>
+              <AiPanel state={aiVob} />
+            </div>
+
+            {/* Bauzeitverlängerung */}
+            <div>
+              <button
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 disabled:opacity-50"
+                disabled={aiBauzeit.loading}
+                onClick={async () => {
+                  setAiBauzeit({ loading: true, text: null, label: "Bauzeitverlängerung", par: "§ 6 Abs. 4 VOB/B" });
+                  try {
+                    const r = await aiApi.generateBauzeitverlaengerung(stoerungId);
+                    setAiBauzeit({ loading: false, text: r.text, label: "Bauzeitverlängerung", par: "§ 6 Abs. 4 VOB/B" });
+                  } catch {
+                    setAiBauzeit({ loading: false, text: "Fehler beim Generieren.", label: "Bauzeitverlängerung", par: "§ 6 Abs. 4 VOB/B" });
+                  }
+                }}
+              >
+                {aiBauzeit.loading ? "⏳ Generiert…" : "Bauzeitverlängerung (§ 6 Abs. 4 VOB/B)"}
+              </button>
+              <AiPanel state={aiBauzeit} />
+            </div>
+
+            {/* Sonstige Dokumente */}
+            <div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="text-xs border border-violet-300 rounded px-2 py-1.5 bg-white text-gray-700"
+                  value={dokTyp}
+                  onChange={(e) => setDokTyp(e.target.value)}
                 >
-                  In Zwischenablage
+                  {DOKUMENT_TYPEN.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label} ({d.par})</option>
+                  ))}
+                </select>
+                <button
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 disabled:opacity-50"
+                  disabled={aiDokument.loading}
+                  onClick={async () => {
+                    const selected = DOKUMENT_TYPEN.find((d) => d.value === dokTyp)!;
+                    setAiDokument({ loading: true, text: null, label: selected.label, par: selected.par });
+                    try {
+                      const r = await aiApi.generateDokumentText(stoerungId, dokTyp);
+                      setAiDokument({ loading: false, text: r.text, label: r.label, par: r.paragraph });
+                    } catch {
+                      setAiDokument({ loading: false, text: "Fehler beim Generieren.", label: selected.label, par: selected.par });
+                    }
+                  }}
+                >
+                  {aiDokument.loading ? "⏳ Generiert…" : "Generieren"}
                 </button>
               </div>
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{aiText}</pre>
+              <AiPanel state={aiDokument} />
             </div>
-          )}
+          </div>
+
+          {/* Anzeigen-Liste */}
           {anzeigen?.map((a) => (
             <div key={a.id} className="border border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-start">
@@ -262,14 +435,14 @@ export default function DisruptionDetailPage() {
         </div>
       )}
 
+      {/* ── Anlagen ── */}
       {tab === "anlagen" && (
         <div className="space-y-4">
           <div className="border border-dashed border-gray-300 rounded-lg p-4">
             <div className="flex gap-3 items-end flex-wrap">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Datei</label>
-                <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                  className="text-sm" />
+                <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} className="text-sm" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Typ</label>
@@ -293,13 +466,84 @@ export default function DisruptionDetailPage() {
         </div>
       )}
 
+      {/* ── Kausalität ── */}
       {tab === "kausalitaet" && (
-        <CausalityMatrix
-          stoerungId={stoerungId}
-          kausalitaeten={kausalitaeten ?? []}
-        />
+        <div className="space-y-4">
+          {/* KI-Vorschläge */}
+          <div className="border border-violet-200 rounded-xl p-4 bg-violet-50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-violet-800 uppercase tracking-wide">✨ KI-Vorschläge für Kausalitätskette</span>
+              <button
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 disabled:opacity-50"
+                disabled={aiKausalitaet.loading}
+                onClick={async () => {
+                  setAiKausalitaet({ loading: true, vorschlaege: [], hinweis: "" });
+                  try {
+                    const r = await aiApi.generateKausalitaetVorschlaege(stoerungId);
+                    setAiKausalitaet({ loading: false, vorschlaege: r.vorschlaege, hinweis: r.hinweis });
+                  } catch {
+                    setAiKausalitaet({ loading: false, vorschlaege: [], hinweis: "Fehler beim Generieren." });
+                  }
+                }}
+              >
+                {aiKausalitaet.loading ? "⏳ Analysiert…" : "Kausalitätskette analysieren"}
+              </button>
+            </div>
+
+            {aiKausalitaet.loading && (
+              <p className="text-sm text-violet-600 animate-pulse">KI analysiert Bautagesberichte und Störungsdaten…</p>
+            )}
+
+            {aiKausalitaet.hinweis && !aiKausalitaet.loading && (
+              <p className="text-xs text-violet-700 mb-2">{aiKausalitaet.hinweis}</p>
+            )}
+
+            {aiKausalitaet.vorschlaege.length > 0 && !aiKausalitaet.loading && (
+              <div className="space-y-3 mt-2">
+                {aiKausalitaet.vorschlaege.map((v, i) => (
+                  <div key={i} className="bg-white border border-violet-100 rounded-lg p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium text-gray-900">{v.ereignis}</span>
+                      <button
+                        onClick={() =>
+                          createKausalitaetMutation.mutate({
+                            stoerung_id: stoerungId,
+                            ereignis: v.ereignis,
+                            verantwortungsbereich: v.verantwortungsbereich,
+                            geplante_leistung: v.geplante_leistung ?? null,
+                            tatsaechliche_leistung: v.tatsaechliche_leistung ?? null,
+                            unmittelbare_auswirkung_json: v.unmittelbare_auswirkung_json ?? null,
+                            mittelbare_auswirkung: v.mittelbare_auswirkung ?? null,
+                            bewertung: v.bewertung ?? null,
+                          })
+                        }
+                        disabled={createKausalitaetMutation.isPending}
+                        className="flex-shrink-0 text-xs px-2 py-1 bg-primary-700 text-white rounded hover:bg-primary-800 disabled:opacity-50"
+                      >
+                        Übernehmen
+                      </button>
+                    </div>
+                    <p className="text-xs text-orange-700 bg-orange-50 rounded px-2 py-0.5 inline-block">
+                      {v.verantwortungsbereich}
+                    </p>
+                    {v.unmittelbare_auswirkung_json && (
+                      <p className="text-xs text-gray-600"><span className="font-medium">Unmittelbar:</span> {v.unmittelbare_auswirkung_json}</p>
+                    )}
+                    {v.mittelbare_auswirkung && (
+                      <p className="text-xs text-gray-500"><span className="font-medium">Mittelbar:</span> {v.mittelbare_auswirkung}</p>
+                    )}
+                    {v.bewertung && <p className="text-xs text-gray-400 italic">Bewertung: {v.bewertung}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <CausalityMatrix stoerungId={stoerungId} kausalitaeten={kausalitaeten ?? []} />
+        </div>
       )}
 
+      {/* ── Protokoll ── */}
       {tab === "protokoll" && (
         <AuditLogTimeline stoerungId={stoerungId} />
       )}

@@ -219,13 +219,55 @@ export const positionBehinderungApi = {
 
 export const aiApi = {
   generateVobText: (stoerungId: number, behinderungsanzeigeId?: number, hinweis?: string) =>
-    api
-      .post<{ text: string; model: string }>("/v1/ai/vob-text", {
-        stoerung_id: stoerungId,
-        behinderungsanzeige_id: behinderungsanzeigeId ?? null,
-        hinweis: hinweis ?? null,
-      })
-      .then((r) => r.data),
+    api.post<{ text: string; model: string }>("/v1/ai/vob-text", {
+      stoerung_id: stoerungId,
+      behinderungsanzeige_id: behinderungsanzeigeId ?? null,
+      hinweis: hinweis ?? null,
+    }).then((r) => r.data),
+
+  generateZusammenfassung: (stoerungId: number) =>
+    api.post<{ text: string; model: string }>("/v1/ai/zusammenfassung", {
+      stoerung_id: stoerungId,
+    }).then((r) => r.data),
+
+  generateBauzeitverlaengerung: (stoerungId: number, hinweis?: string) =>
+    api.post<{ text: string; model: string }>("/v1/ai/bauzeitverlaengerung", {
+      stoerung_id: stoerungId,
+      hinweis: hinweis ?? null,
+    }).then((r) => r.data),
+
+  generateKausalitaetVorschlaege: (stoerungId: number) =>
+    api.post<{
+      vorschlaege: {
+        ereignis: string;
+        verantwortungsbereich: string;
+        geplante_leistung?: string;
+        tatsaechliche_leistung?: string;
+        unmittelbare_auswirkung_json?: string;
+        mittelbare_auswirkung?: string;
+        bewertung?: string;
+      }[];
+      hinweis: string;
+    }>("/v1/ai/kausalitaet-vorschlaege", { stoerung_id: stoerungId }).then((r) => r.data),
+
+  generateDokumentText: (stoerungId: number, dokumentTyp: string, hinweis?: string) =>
+    api.post<{ text: string; label: string; paragraph: string; model: string }>("/v1/ai/dokument-text", {
+      stoerung_id: stoerungId,
+      dokument_typ: dokumentTyp,
+      hinweis: hinweis ?? null,
+    }).then((r) => r.data),
+
+  getUsageStats: () =>
+    api.get<{
+      total_calls: number;
+      total_input_tokens: number;
+      total_output_tokens: number;
+      estimated_cost_usd: number;
+      by_function: { function_type: string; calls: number; input_tokens: number; output_tokens: number }[];
+      calls_today: number;
+      calls_this_month: number;
+      api_key_configured: boolean;
+    }>("/v1/ai/usage").then((r) => r.data),
 };
 
 // ── Company Settings ──────────────────────────────────────────────────────────

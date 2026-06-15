@@ -1,9 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Upload, Trash2, Building2, FileSpreadsheet, Download } from "lucide-react";
-import { companySettingsApi, downloadWithAuth } from "@/api/client";
+import { Upload, Trash2, Building2, FileSpreadsheet, Download, Sparkles, CheckCircle, XCircle } from "lucide-react";
+import { companySettingsApi, downloadWithAuth, aiApi } from "@/api/client";
 import type { CompanySettings } from "@/types";
+
+const FUNCTION_LABELS: Record<string, string> = {
+  vob_text:                "Behinderungsanzeige (§ 6 VOB/B)",
+  zusammenfassung:         "Störungszusammenfassung",
+  bauzeitverlaengerung:    "Bauzeitverlängerung (§ 6 Abs. 4 VOB/B)",
+  kausalitaet_vorschlaege: "Kausalitätsketten-Analyse",
+  dokument_maengelanzeige:   "Mängelanzeige",
+  dokument_bedenkenanmeldung: "Bedenkenanmeldung",
+  dokument_nachtragsforderung: "Nachtragsforderung",
+  dokument_abmahnung_verzug: "Abmahnung Leistungsverzug",
+};
 
 const FONT_OPTIONS = ["Helvetica", "Arial", "Times New Roman", "Georgia"];
 
@@ -44,6 +55,12 @@ export default function CompanySettingsPage() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings"],
     queryFn: () => companySettingsApi.get(),
+  });
+
+  const { data: aiUsage } = useQuery({
+    queryKey: ["ai-usage"],
+    queryFn: () => aiApi.getUsageStats(),
+    refetchInterval: 60_000,
   });
 
   useEffect(() => {
@@ -405,6 +422,61 @@ export default function CompanySettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* KI-Nutzung */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-violet-600" />
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">KI-Nutzung (Claude)</h2>
+        </div>
+
+        {aiUsage && (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              {aiUsage.api_key_configured ? (
+                <><CheckCircle className="w-4 h-4 text-green-500" /><span className="text-green-700">API-Key konfiguriert</span></>
+              ) : (
+                <><XCircle className="w-4 h-4 text-red-500" /><span className="text-red-700">Kein API-Key – KI-Funktionen deaktiviert</span></>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Heute", value: aiUsage.calls_today },
+                { label: "Dieser Monat", value: aiUsage.calls_this_month },
+                { label: "Gesamt", value: aiUsage.total_calls },
+                { label: "Geschätzte Kosten", value: `$${aiUsage.estimated_cost_usd.toFixed(4)}` },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">{label}</p>
+                  <p className="text-lg font-bold text-gray-900">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {aiUsage.by_function.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Aufrufe nach Funktion</p>
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden text-sm">
+                  {aiUsage.by_function.map((f) => (
+                    <div key={f.function_type} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+                      <span className="text-gray-700">{FUNCTION_LABELS[f.function_type] ?? f.function_type}</span>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>{f.calls}×</span>
+                        <span>{(f.input_tokens + f.output_tokens).toLocaleString()} Token</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400">
+              Modell: Claude Sonnet 4.6 · Preise: $3,00 / MTok Input · $15,00 / MTok Output
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
